@@ -1,0 +1,1856 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CheckList Claro – Câmeras &amp; Alarmes</title>
+  <style>
+    /* ── Reset & base ─────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg: #0f1117;
+      --surface: #1a1d27;
+      --surface2: #242736;
+      --border: #2e3148;
+      --accent: #e5032d;
+      --accent2: #ff4d6d;
+      --ok: #22c55e;
+      --warn: #f59e0b;
+      --err: #ef4444;
+      --info: #3b82f6;
+      --text: #e2e8f0;
+      --muted: #94a3b8;
+      --radius: 8px;
+      --shadow: 0 4px 16px rgba(0,0,0,.45);
+    }
+    html { font-size: 15px; }
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Segoe UI', system-ui, sans-serif;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── Header ───────────────────────────────────────────── */
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: .75rem 1.5rem;
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      box-shadow: var(--shadow);
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    header .logo {
+      background: var(--accent);
+      color: #fff;
+      font-weight: 700;
+      font-size: .9rem;
+      padding: .25rem .6rem;
+      border-radius: 4px;
+      letter-spacing: .5px;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 600; flex: 1; }
+    header .clock { color: var(--muted); font-size: .85rem; }
+
+    /* ── Nav ──────────────────────────────────────────────── */
+    nav {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      overflow-x: auto;
+      scrollbar-width: none;
+    }
+    nav::-webkit-scrollbar { display: none; }
+    nav button {
+      background: none;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      padding: .75rem 1.2rem;
+      font-size: .88rem;
+      font-weight: 500;
+      white-space: nowrap;
+      border-bottom: 2px solid transparent;
+      transition: color .15s, border-color .15s;
+    }
+    nav button:hover { color: var(--text); }
+    nav button.active { color: var(--accent2); border-bottom-color: var(--accent2); }
+
+    /* ── Main layout ──────────────────────────────────────── */
+    main { flex: 1; padding: 1.5rem; max-width: 1200px; width: 100%; margin: 0 auto; }
+    .view { display: none; }
+    .view.active { display: block; }
+
+    /* ── Cards / panels ───────────────────────────────────── */
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+      margin-bottom: 1rem;
+      padding-bottom: .5rem;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: .5rem;
+    }
+    .card-title .badge {
+      background: var(--accent);
+      color: #fff;
+      font-size: .7rem;
+      padding: .1rem .4rem;
+      border-radius: 10px;
+    }
+
+    /* ── Buttons ──────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: .35rem;
+      border: none;
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-size: .85rem;
+      font-weight: 500;
+      padding: .5rem 1rem;
+      transition: opacity .15s, transform .1s;
+      text-decoration: none;
+    }
+    .btn:hover { opacity: .88; }
+    .btn:active { transform: scale(.97); }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-success { background: var(--ok); color: #fff; }
+    .btn-warning { background: var(--warn); color: #000; }
+    .btn-danger  { background: var(--err); color: #fff; }
+    .btn-info    { background: var(--info); color: #fff; }
+    .btn-ghost   { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+    .btn-sm { padding: .3rem .65rem; font-size: .78rem; }
+    .btn-group { display: flex; gap: .5rem; flex-wrap: wrap; }
+
+    /* ── Forms ────────────────────────────────────────────── */
+    .form-group { margin-bottom: .9rem; }
+    .form-group label { display: block; font-size: .82rem; color: var(--muted); margin-bottom: .3rem; }
+    .form-row { display: flex; gap: .75rem; flex-wrap: wrap; }
+    .form-row .form-group { flex: 1; min-width: 140px; }
+    input, select, textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-size: .9rem;
+      padding: .5rem .75rem;
+      outline: none;
+      transition: border-color .15s;
+    }
+    input:focus, select:focus, textarea:focus { border-color: var(--accent2); }
+    input::placeholder, textarea::placeholder { color: var(--muted); }
+    select option { background: var(--surface2); }
+    textarea { resize: vertical; min-height: 60px; }
+
+    /* ── Table ────────────────────────────────────────────── */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; font-size: .88rem; }
+    th { text-align: left; padding: .6rem .75rem; color: var(--muted); font-weight: 500;
+         border-bottom: 1px solid var(--border); background: var(--surface2); }
+    td { padding: .55rem .75rem; border-bottom: 1px solid var(--border); vertical-align: middle; }
+    tr:hover td { background: rgba(255,255,255,.03); }
+
+    /* ── Dashboard stats ──────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    .stat-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1rem;
+      display: flex;
+      flex-direction: column;
+      gap: .25rem;
+    }
+    .stat-card .label { font-size: .78rem; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; }
+    .stat-card .value { font-size: 1.8rem; font-weight: 700; }
+    .stat-card.green  { border-left: 3px solid var(--ok);   }
+    .stat-card.red    { border-left: 3px solid var(--err);  }
+    .stat-card.yellow { border-left: 3px solid var(--warn); }
+    .stat-card.blue   { border-left: 3px solid var(--info); }
+
+    /* ── Mosaic grid ──────────────────────────────────────── */
+    .mosaic-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+      gap: .75rem;
+    }
+    .site-tile {
+      background: var(--surface2);
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      padding: .85rem;
+      cursor: pointer;
+      transition: border-color .15s, transform .1s;
+      user-select: none;
+      position: relative;
+    }
+    .site-tile:hover { transform: translateY(-2px); border-color: #4a5270; }
+    .site-tile .site-id { font-size: 1rem; font-weight: 700; letter-spacing: .5px; }
+    .site-tile .site-num { font-size: .8rem; color: var(--muted); }
+    .site-tile .site-status { margin-top: .5rem; font-size: .78rem; font-weight: 600;
+                              padding: .2rem .5rem; border-radius: 4px; display: inline-block; }
+    .site-tile .prev-issue { font-size: .7rem; color: var(--warn); margin-top: .35rem; }
+
+    /* tile colors by status */
+    .site-tile.status-ok        { border-color: var(--ok);   background: rgba(34,197,94,.08);  }
+    .site-tile.status-sem-img   { border-color: var(--err);  background: rgba(239,68,68,.1);   }
+    .site-tile.status-congelada { border-color: var(--warn); background: rgba(245,158,11,.09); }
+    .site-tile.status-vandalismo{ border-color: #a855f7;     background: rgba(168,85,247,.08); }
+    .site-tile.status-outro     { border-color: var(--info); background: rgba(59,130,246,.08); }
+    .site-tile.status-ativado   { border-color: var(--ok);   background: rgba(34,197,94,.08);  }
+    .site-tile.status-desativado{ border-color: var(--err);  background: rgba(239,68,68,.1);   }
+    .site-tile.status-falha     { border-color: var(--warn); background: rgba(245,158,11,.09); }
+
+    .status-badge { display: inline-block; padding: .15rem .45rem; border-radius: 4px; font-size: .75rem; font-weight: 600; }
+    .status-badge.ok         { background: rgba(34,197,94,.2);  color: var(--ok);   }
+    .status-badge.sem-img    { background: rgba(239,68,68,.2);  color: var(--err);  }
+    .status-badge.congelada  { background: rgba(245,158,11,.2); color: var(--warn); }
+    .status-badge.vandalismo { background: rgba(168,85,247,.2); color: #c084fc; }
+    .status-badge.outro      { background: rgba(59,130,246,.2); color: var(--info); }
+    .status-badge.ativado    { background: rgba(34,197,94,.2);  color: var(--ok);   }
+    .status-badge.desativado { background: rgba(239,68,68,.2);  color: var(--err);  }
+    .status-badge.falha      { background: rgba(245,158,11,.2); color: var(--warn); }
+    .status-badge.pendente   { background: rgba(148,163,184,.15); color: var(--muted); }
+
+    /* ── Mosaic nav tabs ──────────────────────────────────── */
+    .mosaic-tabs { display: flex; gap: .4rem; flex-wrap: wrap; margin-bottom: 1rem; }
+    .mosaic-tab {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: .3rem .8rem;
+      font-size: .82rem;
+      cursor: pointer;
+      color: var(--muted);
+      transition: all .15s;
+    }
+    .mosaic-tab.active { background: var(--accent); color: #fff; border-color: var(--accent); }
+    .mosaic-tab .dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+                       margin-right: .3rem; background: var(--muted); }
+    .mosaic-tab .dot.has-issue { background: var(--err); }
+
+    /* ── Modal ────────────────────────────────────────────── */
+    .modal-overlay {
+      display: none;
+      position: fixed; inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 200;
+      align-items: center;
+      justify-content: center;
+      padding: 1rem;
+    }
+    .modal-overlay.open { display: flex; }
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      width: 100%;
+      max-width: 480px;
+      max-height: 90vh;
+      overflow-y: auto;
+      box-shadow: var(--shadow);
+    }
+    .modal-title { font-size: 1rem; font-weight: 600; margin-bottom: 1rem; }
+    .modal-footer { display: flex; gap: .5rem; justify-content: flex-end; margin-top: 1rem; }
+
+    /* ── Status selector (big buttons in modal) ───────────── */
+    .status-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: .5rem; margin-bottom: .75rem; }
+    .status-btn {
+      border: 2px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface2);
+      color: var(--text);
+      cursor: pointer;
+      padding: .65rem .5rem;
+      font-size: .85rem;
+      font-weight: 600;
+      text-align: center;
+      transition: all .15s;
+    }
+    .status-btn:hover { opacity: .88; }
+    .status-btn.selected { border-width: 2px; }
+    .status-btn.s-ok          { border-color: var(--ok);   }
+    .status-btn.s-ok.selected { background: rgba(34,197,94,.2); }
+    .status-btn.s-err          { border-color: var(--err);  }
+    .status-btn.s-err.selected { background: rgba(239,68,68,.2); }
+    .status-btn.s-warn         { border-color: var(--warn); }
+    .status-btn.s-warn.selected{ background: rgba(245,158,11,.2); }
+    .status-btn.s-purple       { border-color: #a855f7; }
+    .status-btn.s-purple.selected { background: rgba(168,85,247,.2); }
+    .status-btn.s-info         { border-color: var(--info); }
+    .status-btn.s-info.selected{ background: rgba(59,130,246,.2); }
+
+    /* ── Progress bar ─────────────────────────────────────── */
+    .progress-wrap { background: var(--surface2); border-radius: 10px; height: 8px; overflow: hidden; margin: .4rem 0; }
+    .progress-bar  { height: 100%; border-radius: 10px; background: var(--ok); transition: width .3s; }
+
+    /* ── Alerts / toasts ──────────────────────────────────── */
+    #toast-container { position: fixed; bottom: 1.5rem; right: 1.5rem; z-index: 999; display: flex; flex-direction: column; gap: .5rem; }
+    .toast {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--ok);
+      border-radius: var(--radius);
+      padding: .75rem 1rem;
+      font-size: .85rem;
+      box-shadow: var(--shadow);
+      animation: slideIn .25s ease;
+      max-width: 320px;
+    }
+    .toast.error { border-left-color: var(--err); }
+    .toast.warn  { border-left-color: var(--warn); }
+    @keyframes slideIn { from { transform: translateX(100%); opacity: 0; } to { transform: none; opacity: 1; } }
+
+    /* ── Empty state ──────────────────────────────────────── */
+    .empty { text-align: center; padding: 2.5rem 1rem; color: var(--muted); }
+    .empty .icon { font-size: 2.5rem; margin-bottom: .5rem; }
+    .empty p { font-size: .9rem; }
+
+    /* ── Section header ───────────────────────────────────── */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; flex-wrap: wrap; gap: .5rem; }
+    .section-header h2 { font-size: 1.1rem; font-weight: 600; }
+
+    /* ── Chips / tags ─────────────────────────────────────── */
+    .chip { display: inline-block; background: var(--surface2); border: 1px solid var(--border);
+            border-radius: 20px; padding: .15rem .5rem; font-size: .75rem; color: var(--muted); }
+
+    /* ── Print styles ─────────────────────────────────────── */
+    @media print {
+      header, nav, .no-print { display: none !important; }
+      body { background: #fff; color: #000; }
+      .card { border: 1px solid #ccc; box-shadow: none; }
+      .site-tile { border: 1px solid #ccc; background: #f9f9f9 !important; }
+    }
+
+    /* ── Responsive ───────────────────────────────────────── */
+    @media (max-width: 600px) {
+      main { padding: 1rem; }
+      .form-row { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ══ HEADER ══════════════════════════════════════════════ -->
+<header>
+  <span class="logo">CLARO</span>
+  <h1>CheckList – Câmeras &amp; Alarmes</h1>
+  <span class="clock" id="clock"></span>
+</header>
+
+<!-- ══ NAV ════════════════════════════════════════════════ -->
+<nav id="nav">
+  <button data-view="dashboard" class="active">🏠 Dashboard</button>
+  <button data-view="sites">📡 Sites</button>
+  <button data-view="mosaicos">🪟 Mosaicos</button>
+  <button data-view="cameras">📷 Ronda Câmeras</button>
+  <button data-view="alarmes">🔔 Ronda Alarmes</button>
+  <button data-view="historico">📋 Histórico</button>
+</nav>
+
+<!-- ══ MAIN ═══════════════════════════════════════════════ -->
+<main>
+
+  <!-- ── DASHBOARD ────────────────────────────────────────── -->
+  <div id="view-dashboard" class="view active">
+    <div class="section-header">
+      <h2>Dashboard</h2>
+      <span id="dash-date" style="color:var(--muted);font-size:.85rem;"></span>
+    </div>
+    <div class="stats-grid" id="stats-grid"></div>
+    <div class="card" id="dash-issues-card">
+      <div class="card-title">⚠️ Sites com Problemas Ativos</div>
+      <div id="dash-issues"></div>
+    </div>
+    <div class="card" id="dash-recent-card">
+      <div class="card-title">🕐 Rondas Recentes</div>
+      <div id="dash-recent"></div>
+    </div>
+  </div>
+
+  <!-- ── SITES ─────────────────────────────────────────────── -->
+  <div id="view-sites" class="view">
+    <div class="section-header">
+      <h2>Gestão de Sites</h2>
+      <div class="btn-group no-print">
+        <button class="btn btn-ghost btn-sm" onclick="importSitesCSV()">⬆️ Importar CSV</button>
+        <button class="btn btn-primary btn-sm" onclick="openSiteModal()">＋ Novo Site</button>
+      </div>
+    </div>
+    <!-- Filter -->
+    <div class="card no-print">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Buscar</label>
+          <input id="sites-search" placeholder="Sigla ou número..." oninput="renderSitesTable()">
+        </div>
+        <div class="form-group">
+          <label>Mosaico</label>
+          <select id="sites-filter-mosaic" onchange="renderSitesTable()">
+            <option value="">Todos</option>
+          </select>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Sigla</th><th>Número</th><th>Nome Completo</th>
+              <th>Mosaico</th><th>Status</th><th class="no-print">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="sites-tbody"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── MOSAICOS ───────────────────────────────────────────── -->
+  <div id="view-mosaicos" class="view">
+    <div class="section-header">
+      <h2>Gestão de Mosaicos</h2>
+      <button class="btn btn-primary btn-sm no-print" onclick="openMosaicoModal()">＋ Novo Mosaico</button>
+    </div>
+    <div id="mosaicos-list"></div>
+  </div>
+
+  <!-- ── RONDA CAMERAS ─────────────────────────────────────── -->
+  <div id="view-cameras" class="view">
+    <div id="cameras-no-ronda">
+      <div class="section-header">
+        <h2>Ronda de Câmeras</h2>
+      </div>
+      <div class="card" style="max-width:500px;">
+        <div class="card-title">Iniciar Nova Ronda</div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="cam-ronda-data">
+        </div>
+        <div class="form-group">
+          <label>Operador</label>
+          <input id="cam-ronda-op" placeholder="Nome do operador">
+        </div>
+        <div class="form-group">
+          <label>Observações gerais</label>
+          <textarea id="cam-ronda-obs" placeholder="Opcional..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="startRondaCameras()">▶ Iniciar Ronda</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Rondas em Andamento</div>
+        <div id="cameras-pending-list"></div>
+      </div>
+    </div>
+
+    <div id="cameras-ronda-view" style="display:none;">
+      <div class="section-header no-print">
+        <h2 id="cameras-ronda-title">Ronda Câmeras</h2>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="finishRondaCameras(false)">💾 Salvar</button>
+          <button class="btn btn-success btn-sm" onclick="finishRondaCameras(true)">✔ Concluir Ronda</button>
+          <button class="btn btn-danger btn-sm" onclick="closeRondaView('cameras')">✕ Fechar</button>
+        </div>
+      </div>
+      <!-- progress -->
+      <div class="card no-print" id="cameras-progress-card">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:.3rem;">
+          <span>Progresso</span><span id="cameras-progress-text"></span>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="cameras-progress-bar"></div></div>
+      </div>
+      <!-- mosaic tabs -->
+      <div class="mosaic-tabs no-print" id="cameras-mosaic-tabs"></div>
+      <!-- sites grid -->
+      <div class="mosaic-grid" id="cameras-mosaic-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── RONDA ALARMES ─────────────────────────────────────── -->
+  <div id="view-alarmes" class="view">
+    <div id="alarmes-no-ronda">
+      <div class="section-header">
+        <h2>Ronda de Alarmes</h2>
+      </div>
+      <div class="card" style="max-width:500px;">
+        <div class="card-title">Iniciar Nova Ronda</div>
+        <div class="form-group">
+          <label>Data</label>
+          <input type="date" id="alm-ronda-data">
+        </div>
+        <div class="form-group">
+          <label>Operador</label>
+          <input id="alm-ronda-op" placeholder="Nome do operador">
+        </div>
+        <div class="form-group">
+          <label>Observações gerais</label>
+          <textarea id="alm-ronda-obs" placeholder="Opcional..."></textarea>
+        </div>
+        <button class="btn btn-primary" onclick="startRondaAlarmes()">▶ Iniciar Ronda</button>
+      </div>
+      <div class="card">
+        <div class="card-title">Rondas em Andamento</div>
+        <div id="alarmes-pending-list"></div>
+      </div>
+    </div>
+
+    <div id="alarmes-ronda-view" style="display:none;">
+      <div class="section-header no-print">
+        <h2 id="alarmes-ronda-title">Ronda Alarmes</h2>
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="finishRondaAlarmes(false)">💾 Salvar</button>
+          <button class="btn btn-success btn-sm" onclick="finishRondaAlarmes(true)">✔ Concluir Ronda</button>
+          <button class="btn btn-danger btn-sm" onclick="closeRondaView('alarmes')">✕ Fechar</button>
+        </div>
+      </div>
+      <div class="card no-print" id="alarmes-progress-card">
+        <div style="display:flex;justify-content:space-between;font-size:.82rem;color:var(--muted);margin-bottom:.3rem;">
+          <span>Progresso</span><span id="alarmes-progress-text"></span>
+        </div>
+        <div class="progress-wrap"><div class="progress-bar" id="alarmes-progress-bar"></div></div>
+      </div>
+      <div class="mosaic-tabs no-print" id="alarmes-mosaic-tabs"></div>
+      <div class="mosaic-grid" id="alarmes-mosaic-grid"></div>
+    </div>
+  </div>
+
+  <!-- ── HISTÓRICO ─────────────────────────────────────────── -->
+  <div id="view-historico" class="view">
+    <div class="section-header">
+      <h2>Histórico de Rondas</h2>
+      <div class="btn-group no-print">
+        <button class="btn btn-ghost btn-sm" onclick="exportHistoricoCSV()">⬇️ Exportar CSV</button>
+        <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+      </div>
+    </div>
+    <!-- Filters -->
+    <div class="card no-print">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tipo</label>
+          <select id="hist-tipo" onchange="renderHistorico()">
+            <option value="">Todos</option>
+            <option value="cameras">Câmeras</option>
+            <option value="alarmes">Alarmes</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Data início</label>
+          <input type="date" id="hist-de" onchange="renderHistorico()">
+        </div>
+        <div class="form-group">
+          <label>Data fim</label>
+          <input type="date" id="hist-ate" onchange="renderHistorico()">
+        </div>
+        <div class="form-group">
+          <label>Site (sigla)</label>
+          <input id="hist-site" placeholder="Ex: PRPCH12" oninput="renderHistorico()">
+        </div>
+      </div>
+    </div>
+    <div id="historico-list"></div>
+  </div>
+
+</main>
+
+<!-- ══ MODALS ════════════════════════════════════════════════ -->
+
+<!-- Site modal -->
+<div class="modal-overlay" id="modal-site">
+  <div class="modal">
+    <div class="modal-title" id="modal-site-title">Novo Site</div>
+    <input type="hidden" id="site-id">
+    <div class="form-row">
+      <div class="form-group">
+        <label>Sigla <span style="color:var(--muted)">(5–10 chars)</span></label>
+        <input id="site-sigla" placeholder="Ex: PRPCH12" maxlength="10" style="text-transform:uppercase"
+               oninput="this.value=this.value.toUpperCase()">
+      </div>
+      <div class="form-group">
+        <label>Número <span style="color:var(--muted)">(4 dígitos)</span></label>
+        <input id="site-numero" placeholder="3425" maxlength="4" pattern="\d{4}">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Nome completo / descrição <span style="color:var(--muted)">(opcional)</span></label>
+      <input id="site-nome" placeholder="Ex: Praça da República CH12">
+    </div>
+    <div class="form-group">
+      <label>Mosaico</label>
+      <select id="site-mosaic"></select>
+    </div>
+    <div class="form-group">
+      <label>Ativo</label>
+      <select id="site-ativo">
+        <option value="1">Sim</option>
+        <option value="0">Não</option>
+      </select>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-site')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveSite()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Mosaico modal -->
+<div class="modal-overlay" id="modal-mosaico">
+  <div class="modal">
+    <div class="modal-title" id="modal-mosaico-title">Novo Mosaico</div>
+    <input type="hidden" id="mosaico-id">
+    <div class="form-group">
+      <label>Nome do Mosaico</label>
+      <input id="mosaico-nome" placeholder="Ex: Mosaico Centro - Página 1">
+    </div>
+    <div class="form-group">
+      <label>Ordem de exibição</label>
+      <input id="mosaico-ordem" type="number" min="1" placeholder="1">
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-mosaico')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveMosaico()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Camera check modal -->
+<div class="modal-overlay" id="modal-cam-check">
+  <div class="modal">
+    <div class="modal-title" id="modal-cam-check-title">Verificar Câmera</div>
+    <input type="hidden" id="modal-cam-site-id">
+    <div id="modal-cam-prev-issue" style="display:none;background:rgba(245,158,11,.1);border:1px solid var(--warn);border-radius:var(--radius);padding:.6rem;margin-bottom:.75rem;font-size:.82rem;color:var(--warn);"></div>
+    <div class="form-group">
+      <label>Status da Câmera</label>
+      <div class="status-grid" id="cam-status-grid">
+        <button class="status-btn s-ok"     data-val="ok"        onclick="selectCamStatus(this)">✅ OK</button>
+        <button class="status-btn s-err"    data-val="sem-img"   onclick="selectCamStatus(this)">📵 Sem Imagem</button>
+        <button class="status-btn s-warn"   data-val="congelada" onclick="selectCamStatus(this)">🧊 Congelada</button>
+        <button class="status-btn s-err"    data-val="escura"    onclick="selectCamStatus(this)">🌑 Escura</button>
+        <button class="status-btn s-purple" data-val="vandalismo"onclick="selectCamStatus(this)">🔨 Vandalismo</button>
+        <button class="status-btn s-info"   data-val="outro"     onclick="selectCamStatus(this)">❓ Outro</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <textarea id="modal-cam-obs" placeholder="Detalhe o problema (opcional)..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-cam-check')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveCamCheck()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Alarm check modal -->
+<div class="modal-overlay" id="modal-alm-check">
+  <div class="modal">
+    <div class="modal-title" id="modal-alm-check-title">Verificar Alarme</div>
+    <input type="hidden" id="modal-alm-site-id">
+    <div id="modal-alm-prev-issue" style="display:none;background:rgba(245,158,11,.1);border:1px solid var(--warn);border-radius:var(--radius);padding:.6rem;margin-bottom:.75rem;font-size:.82rem;color:var(--warn);"></div>
+    <div class="form-group">
+      <label>Status do Alarme</label>
+      <div class="status-grid" id="alm-status-grid">
+        <button class="status-btn s-ok"   data-val="ativado"    onclick="selectAlmStatus(this)">🟢 Ativado</button>
+        <button class="status-btn s-err"  data-val="desativado" onclick="selectAlmStatus(this)">🔴 Desativado</button>
+        <button class="status-btn s-warn" data-val="falha"      onclick="selectAlmStatus(this)">⚠️ Falha</button>
+        <button class="status-btn s-info" data-val="outro"      onclick="selectAlmStatus(this)">❓ Outro</button>
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Observação</label>
+      <textarea id="modal-alm-obs" placeholder="Detalhe (opcional)..."></textarea>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-alm-check')">Cancelar</button>
+      <button class="btn btn-primary" onclick="saveAlmCheck()">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm dialog -->
+<div class="modal-overlay" id="modal-confirm">
+  <div class="modal" style="max-width:360px;">
+    <div class="modal-title">Confirmar</div>
+    <p id="confirm-msg" style="margin-bottom:1rem;color:var(--muted);font-size:.9rem;"></p>
+    <div class="modal-footer">
+      <button class="btn btn-ghost" onclick="closeModal('modal-confirm')">Cancelar</button>
+      <button class="btn btn-danger" id="confirm-ok">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Historico detail -->
+<div class="modal-overlay" id="modal-hist-detail">
+  <div class="modal" style="max-width:700px;">
+    <div class="modal-title" id="hist-detail-title"></div>
+    <div id="hist-detail-body"></div>
+    <div class="modal-footer no-print">
+      <button class="btn btn-ghost btn-sm" onclick="window.print()">🖨️ Imprimir</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-hist-detail')">Fechar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+<!-- ══ SCRIPT ════════════════════════════════════════════════ -->
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   STORAGE LAYER
+   ══════════════════════════════════════════════════════════════ */
+const DB_KEY = 'claro_checklist_v2';
+
+function loadDB() {
+  try {
+    const raw = localStorage.getItem(DB_KEY);
+    if (raw) return JSON.parse(raw);
+  } catch(e) { /* ignore */ }
+  return { sites: [], mosaicos: [], rondas: [], itens: [] };
+}
+
+function saveDB() {
+  localStorage.setItem(DB_KEY, JSON.stringify(db));
+}
+
+let db = loadDB();
+
+function genId() {
+  return Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+}
+
+/* ── Sites CRUD ─────────────────────────────────────────── */
+function getSites(activeOnly = false) {
+  return db.sites.filter(s => !activeOnly || s.ativo);
+}
+function getSiteById(id) { return db.sites.find(s => s.id === id); }
+function getSitesByMosaico(mId) { return db.sites.filter(s => s.mosaicoId === mId && s.ativo); }
+
+function upsertSite(site) {
+  const idx = db.sites.findIndex(s => s.id === site.id);
+  if (idx >= 0) db.sites[idx] = site;
+  else db.sites.push(site);
+  saveDB();
+}
+function deleteSite(id) {
+  db.sites = db.sites.filter(s => s.id !== id);
+  saveDB();
+}
+
+/* ── Mosaicos CRUD ──────────────────────────────────────── */
+function getMosaicos() {
+  return [...db.mosaicos].sort((a, b) => (a.ordem || 0) - (b.ordem || 0));
+}
+function getMosaicoById(id) { return db.mosaicos.find(m => m.id === id); }
+
+function upsertMosaico(m) {
+  const idx = db.mosaicos.findIndex(x => x.id === m.id);
+  if (idx >= 0) db.mosaicos[idx] = m;
+  else db.mosaicos.push(m);
+  saveDB();
+}
+function deleteMosaico(id) {
+  db.mosaicos = db.mosaicos.filter(m => m.id !== id);
+  db.sites.forEach(s => { if (s.mosaicoId === id) s.mosaicoId = null; });
+  saveDB();
+}
+
+/* ── Rondas CRUD ────────────────────────────────────────── */
+function getRondas(tipo) {
+  return db.rondas.filter(r => r.tipo === tipo).sort((a, b) => b.data.localeCompare(a.data));
+}
+function getRondaById(id) { return db.rondas.find(r => r.id === id); }
+function getPendingRondas(tipo) { return getRondas(tipo).filter(r => r.status === 'em_andamento'); }
+
+function upsertRonda(r) {
+  const idx = db.rondas.findIndex(x => x.id === r.id);
+  if (idx >= 0) db.rondas[idx] = r;
+  else db.rondas.push(r);
+  saveDB();
+}
+function deleteRonda(id) {
+  db.rondas = db.rondas.filter(r => r.id !== id);
+  db.itens = db.itens.filter(i => i.rondaId !== id);
+  saveDB();
+}
+
+/* ── Itens CRUD ─────────────────────────────────────────── */
+function getItens(rondaId) { return db.itens.filter(i => i.rondaId === rondaId); }
+function getItemBySite(rondaId, siteId) { return db.itens.find(i => i.rondaId === rondaId && i.siteId === siteId); }
+
+function upsertItem(item) {
+  const idx = db.itens.findIndex(i => i.rondaId === item.rondaId && i.siteId === item.siteId);
+  if (idx >= 0) db.itens[idx] = item;
+  else db.itens.push(item);
+  saveDB();
+}
+
+/* Get last status for a site in a specific type of ronda (for showing history) */
+function getLastSiteStatus(siteId, tipo, excludeRondaId) {
+  const rondaIds = getRondas(tipo)
+    .filter(r => r.id !== excludeRondaId && r.status === 'concluida')
+    .map(r => r.id);
+  for (const rid of rondaIds) {
+    const item = db.itens.find(i => i.rondaId === rid && i.siteId === siteId);
+    if (item) return { item, ronda: getRondaById(rid) };
+  }
+  return null;
+}
+
+/* Get sites with active issues (last camera ronda had problems) */
+function getSitesWithActiveIssues() {
+  const lastRonda = getRondas('cameras').find(r => r.status === 'concluida');
+  if (!lastRonda) return [];
+  return db.itens
+    .filter(i => i.rondaId === lastRonda.id && i.status !== 'ok')
+    .map(i => ({ item: i, site: getSiteById(i.siteId), ronda: lastRonda }))
+    .filter(x => x.site);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STATE
+   ══════════════════════════════════════════════════════════════ */
+let state = {
+  activeView: 'dashboard',
+  camRondaId: null,
+  almRondaId: null,
+  camActiveMosaic: null,
+  almActiveMosaic: null,
+};
+
+/* ══════════════════════════════════════════════════════════════
+   CLOCK
+   ══════════════════════════════════════════════════════════════ */
+function updateClock() {
+  const now = new Date();
+  document.getElementById('clock').textContent =
+    now.toLocaleDateString('pt-BR') + ' ' + now.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+/* ══════════════════════════════════════════════════════════════
+   NAVIGATION
+   ══════════════════════════════════════════════════════════════ */
+document.getElementById('nav').addEventListener('click', e => {
+  const btn = e.target.closest('[data-view]');
+  if (!btn) return;
+  showView(btn.dataset.view);
+});
+
+function showView(name) {
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.querySelectorAll('#nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('view-' + name).classList.add('active');
+  document.querySelector(`#nav [data-view="${name}"]`).classList.add('active');
+  state.activeView = name;
+  if (name === 'dashboard') renderDashboard();
+  if (name === 'sites')     renderSitesTable();
+  if (name === 'mosaicos')  renderMosaicosList();
+  if (name === 'cameras')   renderCamerasView();
+  if (name === 'alarmes')   renderAlarmesView();
+  if (name === 'historico') renderHistorico();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODAL HELPERS
+   ══════════════════════════════════════════════════════════════ */
+function openModal(id) { document.getElementById(id).classList.add('open'); }
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Close on overlay click
+document.querySelectorAll('.modal-overlay').forEach(overlay => {
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) overlay.classList.remove('open');
+  });
+});
+
+/* confirm helper */
+let _confirmCallback = null;
+function confirm(msg, cb) {
+  document.getElementById('confirm-msg').textContent = msg;
+  _confirmCallback = cb;
+  openModal('modal-confirm');
+}
+document.getElementById('confirm-ok').addEventListener('click', () => {
+  closeModal('modal-confirm');
+  if (_confirmCallback) { _confirmCallback(); _confirmCallback = null; }
+});
+
+/* ══════════════════════════════════════════════════════════════
+   TOAST
+   ══════════════════════════════════════════════════════════════ */
+function toast(msg, type = 'ok') {
+  const el = document.createElement('div');
+  el.className = 'toast' + (type !== 'ok' ? ' ' + type : '');
+  el.textContent = msg;
+  document.getElementById('toast-container').appendChild(el);
+  setTimeout(() => el.remove(), 3000);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   STATUS HELPERS
+   ══════════════════════════════════════════════════════════════ */
+const CAM_STATUS_LABELS = {
+  ok: '✅ OK', 'sem-img': '📵 Sem Imagem', congelada: '🧊 Congelada',
+  escura: '🌑 Escura', vandalismo: '🔨 Vandalismo', outro: '❓ Outro', pendente: '— Pendente'
+};
+const ALM_STATUS_LABELS = {
+  ativado: '🟢 Ativado', desativado: '🔴 Desativado', falha: '⚠️ Falha', outro: '❓ Outro', pendente: '— Pendente'
+};
+
+function statusBadge(val, tipo) {
+  const labels = tipo === 'alarmes' ? ALM_STATUS_LABELS : CAM_STATUS_LABELS;
+  const label = labels[val] || val;
+  const cls = val === 'ok' || val === 'ativado' ? 'ok'
+            : val === 'sem-img' || val === 'desativado' ? 'sem-img'
+            : val === 'congelada' || val === 'falha' ? 'congelada'
+            : val === 'vandalismo' ? 'vandalismo'
+            : val === 'escura' ? 'sem-img'
+            : val === 'outro' ? 'outro'
+            : 'pendente';
+  return `<span class="status-badge ${cls}">${label}</span>`;
+}
+
+function isIssue(status, tipo) {
+  if (tipo === 'cameras') return status && status !== 'ok';
+  if (tipo === 'alarmes') return status && status !== 'ativado';
+  return false;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   DASHBOARD
+   ══════════════════════════════════════════════════════════════ */
+function renderDashboard() {
+  document.getElementById('dash-date').textContent =
+    new Date().toLocaleDateString('pt-BR', { weekday:'long', year:'numeric', month:'long', day:'numeric' });
+
+  const totalSites = getSites(true).length;
+  const activeIssues = getSitesWithActiveIssues();
+  const totalRondas = db.rondas.filter(r => r.status === 'concluida').length;
+  const pending = db.rondas.filter(r => r.status === 'em_andamento').length;
+
+  document.getElementById('stats-grid').innerHTML = `
+    <div class="stat-card blue"><div class="label">Sites Ativos</div><div class="value">${totalSites}</div></div>
+    <div class="stat-card red"><div class="label">Problemas Ativos</div><div class="value">${activeIssues.length}</div></div>
+    <div class="stat-card green"><div class="label">Rondas Concluídas</div><div class="value">${totalRondas}</div></div>
+    <div class="stat-card yellow"><div class="label">Rondas em Aberto</div><div class="value">${pending}</div></div>
+  `;
+
+  // Active issues table
+  const issueEl = document.getElementById('dash-issues');
+  if (activeIssues.length === 0) {
+    issueEl.innerHTML = '<div class="empty"><div class="icon">✅</div><p>Nenhum problema ativo</p></div>';
+  } else {
+    issueEl.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Site</th><th>Número</th><th>Mosaico</th><th>Status</th><th>Observação</th><th>Data</th></tr></thead>
+          <tbody>${activeIssues.map(({ item, site, ronda }) => {
+            const mosaic = site.mosaicoId ? getMosaicoById(site.mosaicoId) : null;
+            return `<tr>
+              <td><strong>${site.sigla}</strong></td>
+              <td>${site.numero}</td>
+              <td>${mosaic ? mosaic.nome : '—'}</td>
+              <td>${statusBadge(item.status, 'cameras')}</td>
+              <td style="color:var(--muted);font-size:.8rem;">${item.obs || '—'}</td>
+              <td style="color:var(--muted);font-size:.8rem;">${formatDate(ronda.data)}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`;
+  }
+
+  // Recent rondas
+  const recent = db.rondas.sort((a, b) => b.criadoEm - a.criadoEm).slice(0, 5);
+  const recentEl = document.getElementById('dash-recent');
+  if (recent.length === 0) {
+    recentEl.innerHTML = '<div class="empty"><div class="icon">📋</div><p>Nenhuma ronda registrada</p></div>';
+  } else {
+    recentEl.innerHTML = `
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th>Tipo</th><th>Data</th><th>Operador</th><th>Status</th><th>Sites</th><th>Problemas</th></tr></thead>
+          <tbody>${recent.map(r => {
+            const itens = getItens(r.id);
+            const issues = itens.filter(i => isIssue(i.status, r.tipo)).length;
+            return `<tr>
+              <td><span class="chip">${r.tipo === 'cameras' ? '📷 Câmeras' : '🔔 Alarmes'}</span></td>
+              <td>${formatDate(r.data)}</td>
+              <td>${r.operador || '—'}</td>
+              <td>${r.status === 'concluida' ? '<span style="color:var(--ok)">✔ Concluída</span>' : '<span style="color:var(--warn)">⏳ Em andamento</span>'}</td>
+              <td>${itens.length}/${getSites(true).length}</td>
+              <td>${issues > 0 ? `<span style="color:var(--err)">⚠️ ${issues}</span>` : '<span style="color:var(--ok)">0</span>'}</td>
+            </tr>`;
+          }).join('')}</tbody>
+        </table>
+      </div>`;
+  }
+}
+
+function formatDate(d) {
+  if (!d) return '—';
+  // d can be YYYY-MM-DD
+  const [y, m, day] = d.split('-');
+  if (!y) return d;
+  return `${day}/${m}/${y}`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SITES
+   ══════════════════════════════════════════════════════════════ */
+function renderSitesTable() {
+  const q = (document.getElementById('sites-search').value || '').toLowerCase();
+  const mf = document.getElementById('sites-filter-mosaic').value;
+
+  // populate filter
+  const sel = document.getElementById('sites-filter-mosaic');
+  const oldVal = sel.value;
+  sel.innerHTML = '<option value="">Todos os mosaicos</option>' +
+    getMosaicos().map(m => `<option value="${m.id}" ${m.id === oldVal ? 'selected' : ''}>${m.nome}</option>`).join('');
+
+  const sites = getSites().filter(s => {
+    const matchQ = !q || s.sigla.toLowerCase().includes(q) || s.numero.includes(q) || (s.nome || '').toLowerCase().includes(q);
+    const matchM = !mf || s.mosaicoId === mf;
+    return matchQ && matchM;
+  });
+
+  const tbody = document.getElementById('sites-tbody');
+  if (sites.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="6" style="text-align:center;color:var(--muted);padding:2rem;">Nenhum site encontrado</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = sites.map(s => {
+    const mosaic = s.mosaicoId ? getMosaicoById(s.mosaicoId) : null;
+    const lastStatus = getLastSiteStatus(s.id, 'cameras', null);
+    return `<tr>
+      <td><strong>${s.sigla}</strong></td>
+      <td>${s.numero}</td>
+      <td style="color:var(--muted)">${s.nome || '—'}</td>
+      <td>${mosaic ? mosaic.nome : '<span style="color:var(--muted)">—</span>'}</td>
+      <td>
+        ${s.ativo ? '<span style="color:var(--ok)">● Ativo</span>' : '<span style="color:var(--muted)">○ Inativo</span>'}
+        ${lastStatus && lastStatus.item.status !== 'ok' ? ` ${statusBadge(lastStatus.item.status, 'cameras')}` : ''}
+      </td>
+      <td class="no-print">
+        <div class="btn-group">
+          <button class="btn btn-ghost btn-sm" onclick="openSiteModal('${s.id}')">✏️</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteSite('${s.id}')">🗑️</button>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function openSiteModal(id) {
+  const mosaicos = getMosaicos();
+  document.getElementById('site-mosaic').innerHTML =
+    '<option value="">— Sem mosaico —</option>' +
+    mosaicos.map(m => `<option value="${m.id}">${m.nome}</option>`).join('');
+
+  if (id) {
+    const s = getSiteById(id);
+    if (!s) return;
+    document.getElementById('modal-site-title').textContent = 'Editar Site';
+    document.getElementById('site-id').value = s.id;
+    document.getElementById('site-sigla').value = s.sigla;
+    document.getElementById('site-numero').value = s.numero;
+    document.getElementById('site-nome').value = s.nome || '';
+    document.getElementById('site-mosaic').value = s.mosaicoId || '';
+    document.getElementById('site-ativo').value = s.ativo ? '1' : '0';
+  } else {
+    document.getElementById('modal-site-title').textContent = 'Novo Site';
+    document.getElementById('site-id').value = '';
+    document.getElementById('site-sigla').value = '';
+    document.getElementById('site-numero').value = '';
+    document.getElementById('site-nome').value = '';
+    document.getElementById('site-mosaic').value = '';
+    document.getElementById('site-ativo').value = '1';
+  }
+  openModal('modal-site');
+}
+
+function saveSite() {
+  const sigla = document.getElementById('site-sigla').value.trim().toUpperCase();
+  const numero = document.getElementById('site-numero').value.trim();
+
+  if (!sigla || sigla.length < 2 || sigla.length > 10) {
+    toast('Sigla deve ter 2 a 10 caracteres', 'error'); return;
+  }
+  if (!/^\d{4}$/.test(numero)) {
+    toast('Número deve ter exatamente 4 dígitos', 'error'); return;
+  }
+
+  const id = document.getElementById('site-id').value || genId();
+  upsertSite({
+    id,
+    sigla,
+    numero,
+    nome: document.getElementById('site-nome').value.trim(),
+    mosaicoId: document.getElementById('site-mosaic').value || null,
+    ativo: document.getElementById('site-ativo').value === '1',
+  });
+
+  closeModal('modal-site');
+  renderSitesTable();
+  toast('Site salvo com sucesso!');
+}
+
+function confirmDeleteSite(id) {
+  const s = getSiteById(id);
+  confirm(`Excluir o site ${s.sigla}-${s.numero}? Esta ação não pode ser desfeita.`, () => {
+    deleteSite(id);
+    renderSitesTable();
+    toast('Site excluído.');
+  });
+}
+
+/* Import CSV */
+function importSitesCSV() {
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.csv,.txt';
+  input.onchange = e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const lines = ev.target.result.split('\n').slice(1); // skip header
+      let count = 0;
+      lines.forEach(line => {
+        const parts = line.split(/[,;]/).map(p => p.trim().replace(/^"|"$/g, ''));
+        const [sigla, numero, nome, mosaicoNome] = parts;
+        if (!sigla || !numero) return;
+        let mosaicoId = null;
+        if (mosaicoNome) {
+          const m = db.mosaicos.find(x => x.nome.toLowerCase() === mosaicoNome.toLowerCase());
+          if (m) mosaicoId = m.id;
+        }
+        upsertSite({ id: genId(), sigla: sigla.toUpperCase(), numero, nome: nome || '', mosaicoId, ativo: true });
+        count++;
+      });
+      renderSitesTable();
+      toast(`${count} sites importados!`);
+    };
+    reader.readAsText(file);
+  };
+  input.click();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MOSAICOS
+   ══════════════════════════════════════════════════════════════ */
+function renderMosaicosList() {
+  const mosaicos = getMosaicos();
+  const el = document.getElementById('mosaicos-list');
+  if (mosaicos.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">🪟</div><p>Nenhum mosaico cadastrado.<br>Clique em "+ Novo Mosaico" para começar.</p></div>';
+    return;
+  }
+  el.innerHTML = mosaicos.map(m => {
+    const sites = getSitesByMosaico(m.id);
+    const siteList = sites.length === 0
+      ? '<div style="color:var(--muted);font-size:.82rem;padding:.5rem 0;">Nenhum site neste mosaico</div>'
+      : `<div class="mosaic-grid" style="margin-top:.5rem;">${sites.map(s => `
+          <div class="site-tile" style="cursor:default;">
+            <div class="site-id">${s.sigla}</div>
+            <div class="site-num">${s.numero}</div>
+            ${s.nome ? `<div style="font-size:.75rem;color:var(--muted);margin-top:.2rem;">${s.nome}</div>` : ''}
+          </div>`).join('')}</div>`;
+    return `<div class="card">
+      <div class="card-title">
+        ${m.nome}
+        <span style="color:var(--muted);font-size:.8rem;font-weight:400;margin-left:.25rem;">(${sites.length} sites)</span>
+        <div class="btn-group" style="margin-left:auto;">
+          <button class="btn btn-ghost btn-sm no-print" onclick="openMosaicoModal('${m.id}')">✏️ Editar</button>
+          <button class="btn btn-danger btn-sm no-print" onclick="confirmDeleteMosaico('${m.id}')">🗑️</button>
+        </div>
+      </div>
+      ${siteList}
+    </div>`;
+  }).join('');
+}
+
+function openMosaicoModal(id) {
+  if (id) {
+    const m = getMosaicoById(id);
+    if (!m) return;
+    document.getElementById('modal-mosaico-title').textContent = 'Editar Mosaico';
+    document.getElementById('mosaico-id').value = m.id;
+    document.getElementById('mosaico-nome').value = m.nome;
+    document.getElementById('mosaico-ordem').value = m.ordem || '';
+  } else {
+    document.getElementById('modal-mosaico-title').textContent = 'Novo Mosaico';
+    document.getElementById('mosaico-id').value = '';
+    document.getElementById('mosaico-nome').value = '';
+    document.getElementById('mosaico-ordem').value = getMosaicos().length + 1;
+  }
+  openModal('modal-mosaico');
+}
+
+function saveMosaico() {
+  const nome = document.getElementById('mosaico-nome').value.trim();
+  if (!nome) { toast('Nome do mosaico é obrigatório', 'error'); return; }
+  const id = document.getElementById('mosaico-id').value || genId();
+  upsertMosaico({ id, nome, ordem: parseInt(document.getElementById('mosaico-ordem').value) || 1 });
+  closeModal('modal-mosaico');
+  renderMosaicosList();
+  toast('Mosaico salvo!');
+}
+
+function confirmDeleteMosaico(id) {
+  const m = getMosaicoById(id);
+  confirm(`Excluir mosaico "${m.nome}"? Os sites serão desvinculados.`, () => {
+    deleteMosaico(id);
+    renderMosaicosList();
+    toast('Mosaico excluído.');
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RONDA CAMERAS
+   ══════════════════════════════════════════════════════════════ */
+function renderCamerasView() {
+  populatePendingList('cameras');
+  if (state.camRondaId) {
+    openCamerasRondaView(state.camRondaId);
+  } else {
+    document.getElementById('cameras-no-ronda').style.display = 'block';
+    document.getElementById('cameras-ronda-view').style.display = 'none';
+  }
+  // set today's date
+  const d = document.getElementById('cam-ronda-data');
+  if (!d.value) d.value = todayISO();
+}
+
+function populatePendingList(tipo) {
+  const pending = getPendingRondas(tipo);
+  const el = document.getElementById(tipo + '-pending-list');
+  if (pending.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>Nenhuma ronda em andamento</p></div>';
+    return;
+  }
+  el.innerHTML = `<div class="table-wrap"><table>
+    <thead><tr><th>Data</th><th>Operador</th><th>Progresso</th><th>Ações</th></tr></thead>
+    <tbody>${pending.map(r => {
+      const itens = getItens(r.id);
+      const total = getSites(true).length;
+      return `<tr>
+        <td>${formatDate(r.data)}</td>
+        <td>${r.operador || '—'}</td>
+        <td>${itens.length} / ${total} verificados</td>
+        <td>
+          <button class="btn btn-info btn-sm" onclick="openExistingRonda('${tipo}','${r.id}')">▶ Continuar</button>
+          <button class="btn btn-danger btn-sm" onclick="confirmDeleteRonda('${r.id}')">🗑️</button>
+        </td>
+      </tr>`;
+    }).join('')}</tbody></table></div>`;
+}
+
+function openExistingRonda(tipo, id) {
+  if (tipo === 'cameras') { state.camRondaId = id; renderCamerasView(); }
+  else { state.almRondaId = id; renderAlarmesView(); }
+}
+
+function confirmDeleteRonda(id) {
+  confirm('Excluir esta ronda e todos os registros? Esta ação não pode ser desfeita.', () => {
+    deleteRonda(id);
+    if (state.camRondaId === id) { state.camRondaId = null; renderCamerasView(); }
+    if (state.almRondaId === id) { state.almRondaId = null; renderAlarmesView(); }
+    toast('Ronda excluída.');
+    renderDashboard();
+  });
+}
+
+function startRondaCameras() {
+  const data = document.getElementById('cam-ronda-data').value;
+  const op   = document.getElementById('cam-ronda-op').value.trim();
+  const obs  = document.getElementById('cam-ronda-obs').value.trim();
+  if (!data) { toast('Informe a data', 'error'); return; }
+  const ronda = { id: genId(), tipo: 'cameras', data, operador: op, obs, status: 'em_andamento', criadoEm: Date.now() };
+  upsertRonda(ronda);
+  state.camRondaId = ronda.id;
+  openCamerasRondaView(ronda.id);
+  toast('Ronda iniciada!');
+}
+
+function openCamerasRondaView(rondaId) {
+  const ronda = getRondaById(rondaId);
+  if (!ronda) return;
+
+  document.getElementById('cameras-no-ronda').style.display = 'none';
+  document.getElementById('cameras-ronda-view').style.display = 'block';
+  document.getElementById('cameras-ronda-title').textContent =
+    `📷 Ronda Câmeras – ${formatDate(ronda.data)}${ronda.operador ? ' – ' + ronda.operador : ''}`;
+
+  renderCamerasMosaicTabs();
+  updateCamerasProgress();
+}
+
+function renderCamerasMosaicTabs() {
+  const mosaicos = getMosaicos();
+  const noMosaicSites = getSites(true).filter(s => !s.mosaicoId);
+
+  const tabsEl = document.getElementById('cameras-mosaic-tabs');
+  const items = [...mosaicos];
+  if (noMosaicSites.length > 0) items.push({ id: '__no_mosaic__', nome: 'Sem Mosaico', ordem: 999 });
+
+  if (!state.camActiveMosaic || !items.find(m => m.id === state.camActiveMosaic)) {
+    state.camActiveMosaic = items[0] ? items[0].id : null;
+  }
+
+  tabsEl.innerHTML = items.map(m => {
+    const sites = m.id === '__no_mosaic__'
+      ? noMosaicSites
+      : getSitesByMosaico(m.id);
+    const itens = getItens(state.camRondaId);
+    const hasIssue = sites.some(s => {
+      const item = itens.find(i => i.siteId === s.id);
+      return item && item.status !== 'ok';
+    });
+    return `<div class="mosaic-tab ${m.id === state.camActiveMosaic ? 'active' : ''}"
+                 onclick="selectCamerasMosaic('${m.id}')">
+      <span class="dot ${hasIssue ? 'has-issue' : ''}"></span>${m.nome}
+    </div>`;
+  }).join('');
+
+  renderCamerasMosaicGrid();
+}
+
+function selectCamerasMosaic(id) {
+  state.camActiveMosaic = id;
+  renderCamerasMosaicTabs();
+}
+
+function renderCamerasMosaicGrid() {
+  const rondaId = state.camRondaId;
+  const sites = state.camActiveMosaic === '__no_mosaic__'
+    ? getSites(true).filter(s => !s.mosaicoId)
+    : getSitesByMosaico(state.camActiveMosaic);
+
+  const grid = document.getElementById('cameras-mosaic-grid');
+  if (sites.length === 0) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><p>Nenhum site neste mosaico</p></div>';
+    return;
+  }
+
+  grid.innerHTML = sites.map(s => {
+    const item = getItemBySite(rondaId, s.id);
+    const status = item ? item.status : 'pendente';
+    const statusLabel = CAM_STATUS_LABELS[status] || status;
+    const prevResult = getLastSiteStatus(s.id, 'cameras', rondaId);
+    const prevIssue = prevResult && prevResult.item.status !== 'ok'
+      ? `⚠️ Última ronda (${formatDate(prevResult.ronda.data)}): ${CAM_STATUS_LABELS[prevResult.item.status]}`
+      : null;
+
+    return `<div class="site-tile status-${status}" onclick="openCamCheckModal('${s.id}')">
+      <div class="site-id">${s.sigla}</div>
+      <div class="site-num">${s.numero}</div>
+      ${s.nome ? `<div style="font-size:.72rem;color:var(--muted);margin-top:.15rem;">${s.nome}</div>` : ''}
+      <div class="site-status">${statusLabel}</div>
+      ${item && item.obs ? `<div class="prev-issue" style="color:var(--info)">📝 ${item.obs}</div>` : ''}
+      ${prevIssue ? `<div class="prev-issue">${prevIssue}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function updateCamerasProgress() {
+  const sites = getSites(true);
+  const itens = getItens(state.camRondaId);
+  const done = itens.length;
+  const total = sites.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('cameras-progress-text').textContent = `${done} / ${total} (${pct}%)`;
+  document.getElementById('cameras-progress-bar').style.width = pct + '%';
+}
+
+let _camSelectedStatus = null;
+function openCamCheckModal(siteId) {
+  const site = getSiteById(siteId);
+  if (!site) return;
+  _camSelectedStatus = null;
+
+  document.getElementById('modal-cam-check-title').textContent = `${site.sigla} – ${site.numero}`;
+  document.getElementById('modal-cam-site-id').value = siteId;
+
+  // Prefill existing
+  const existing = getItemBySite(state.camRondaId, siteId);
+  if (existing) {
+    _camSelectedStatus = existing.status;
+    document.getElementById('modal-cam-obs').value = existing.obs || '';
+  } else {
+    document.getElementById('modal-cam-obs').value = '';
+  }
+
+  // Highlight selected status
+  document.querySelectorAll('#cam-status-grid .status-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.val === _camSelectedStatus);
+  });
+
+  // Previous issue
+  const prevResult = getLastSiteStatus(siteId, 'cameras', state.camRondaId);
+  const prevEl = document.getElementById('modal-cam-prev-issue');
+  if (prevResult && prevResult.item.status !== 'ok') {
+    prevEl.style.display = 'block';
+    prevEl.textContent = `⚠️ Ronda anterior (${formatDate(prevResult.ronda.data)}): ${CAM_STATUS_LABELS[prevResult.item.status]}${prevResult.item.obs ? ' – ' + prevResult.item.obs : ''}`;
+  } else {
+    prevEl.style.display = 'none';
+  }
+
+  openModal('modal-cam-check');
+}
+
+function selectCamStatus(btn) {
+  _camSelectedStatus = btn.dataset.val;
+  document.querySelectorAll('#cam-status-grid .status-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveCamCheck() {
+  if (!_camSelectedStatus) { toast('Selecione um status', 'error'); return; }
+  const siteId = document.getElementById('modal-cam-site-id').value;
+  const obs = document.getElementById('modal-cam-obs').value.trim();
+  upsertItem({ rondaId: state.camRondaId, siteId, status: _camSelectedStatus, obs, ts: Date.now() });
+  closeModal('modal-cam-check');
+  renderCamerasMosaicGrid();
+  renderCamerasMosaicTabs();
+  updateCamerasProgress();
+}
+
+function finishRondaCameras(conclude) {
+  const ronda = getRondaById(state.camRondaId);
+  if (!ronda) return;
+  if (conclude) {
+    ronda.status = 'concluida';
+    upsertRonda(ronda);
+    toast('Ronda concluída e salva!');
+    state.camRondaId = null;
+    closeRondaView('cameras');
+  } else {
+    upsertRonda(ronda);
+    toast('Progresso salvo!');
+  }
+  renderDashboard();
+}
+
+function closeRondaView(tipo) {
+  if (tipo === 'cameras') {
+    state.camRondaId = null;
+    document.getElementById('cameras-no-ronda').style.display = 'block';
+    document.getElementById('cameras-ronda-view').style.display = 'none';
+    populatePendingList('cameras');
+  } else {
+    state.almRondaId = null;
+    document.getElementById('alarmes-no-ronda').style.display = 'block';
+    document.getElementById('alarmes-ronda-view').style.display = 'none';
+    populatePendingList('alarmes');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RONDA ALARMES
+   ══════════════════════════════════════════════════════════════ */
+function renderAlarmesView() {
+  populatePendingList('alarmes');
+  if (state.almRondaId) {
+    openAlarmesRondaView(state.almRondaId);
+  } else {
+    document.getElementById('alarmes-no-ronda').style.display = 'block';
+    document.getElementById('alarmes-ronda-view').style.display = 'none';
+  }
+  const d = document.getElementById('alm-ronda-data');
+  if (!d.value) d.value = todayISO();
+}
+
+function startRondaAlarmes() {
+  const data = document.getElementById('alm-ronda-data').value;
+  const op   = document.getElementById('alm-ronda-op').value.trim();
+  const obs  = document.getElementById('alm-ronda-obs').value.trim();
+  if (!data) { toast('Informe a data', 'error'); return; }
+  const ronda = { id: genId(), tipo: 'alarmes', data, operador: op, obs, status: 'em_andamento', criadoEm: Date.now() };
+  upsertRonda(ronda);
+  state.almRondaId = ronda.id;
+  openAlarmesRondaView(ronda.id);
+  toast('Ronda de alarmes iniciada!');
+}
+
+function openAlarmesRondaView(rondaId) {
+  const ronda = getRondaById(rondaId);
+  if (!ronda) return;
+  document.getElementById('alarmes-no-ronda').style.display = 'none';
+  document.getElementById('alarmes-ronda-view').style.display = 'block';
+  document.getElementById('alarmes-ronda-title').textContent =
+    `🔔 Ronda Alarmes – ${formatDate(ronda.data)}${ronda.operador ? ' – ' + ronda.operador : ''}`;
+  renderAlarmesMosaicTabs();
+  updateAlarmesProgress();
+}
+
+function renderAlarmesMosaicTabs() {
+  const mosaicos = getMosaicos();
+  const noMosaicSites = getSites(true).filter(s => !s.mosaicoId);
+  const items = [...mosaicos];
+  if (noMosaicSites.length > 0) items.push({ id: '__no_mosaic__', nome: 'Sem Mosaico', ordem: 999 });
+
+  if (!state.almActiveMosaic || !items.find(m => m.id === state.almActiveMosaic)) {
+    state.almActiveMosaic = items[0] ? items[0].id : null;
+  }
+
+  const tabsEl = document.getElementById('alarmes-mosaic-tabs');
+  tabsEl.innerHTML = items.map(m => {
+    const sites = m.id === '__no_mosaic__' ? noMosaicSites : getSitesByMosaico(m.id);
+    const itens = getItens(state.almRondaId);
+    const hasIssue = sites.some(s => {
+      const item = itens.find(i => i.siteId === s.id);
+      return item && item.status !== 'ativado';
+    });
+    return `<div class="mosaic-tab ${m.id === state.almActiveMosaic ? 'active' : ''}"
+                 onclick="selectAlarmesMosaic('${m.id}')">
+      <span class="dot ${hasIssue ? 'has-issue' : ''}"></span>${m.nome}
+    </div>`;
+  }).join('');
+
+  renderAlarmesMosaicGrid();
+}
+
+function selectAlarmesMosaic(id) {
+  state.almActiveMosaic = id;
+  renderAlarmesMosaicTabs();
+}
+
+function renderAlarmesMosaicGrid() {
+  const rondaId = state.almRondaId;
+  const sites = state.almActiveMosaic === '__no_mosaic__'
+    ? getSites(true).filter(s => !s.mosaicoId)
+    : getSitesByMosaico(state.almActiveMosaic);
+
+  const grid = document.getElementById('alarmes-mosaic-grid');
+  if (sites.length === 0) {
+    grid.innerHTML = '<div class="empty" style="grid-column:1/-1;"><p>Nenhum site neste mosaico</p></div>';
+    return;
+  }
+
+  grid.innerHTML = sites.map(s => {
+    const item = getItemBySite(rondaId, s.id);
+    const status = item ? item.status : 'pendente';
+    const statusLabel = ALM_STATUS_LABELS[status] || status;
+    const prevResult = getLastSiteStatus(s.id, 'alarmes', rondaId);
+    const prevIssue = prevResult && prevResult.item.status !== 'ativado'
+      ? `⚠️ Última ronda (${formatDate(prevResult.ronda.data)}): ${ALM_STATUS_LABELS[prevResult.item.status]}`
+      : null;
+
+    return `<div class="site-tile status-${status}" onclick="openAlmCheckModal('${s.id}')">
+      <div class="site-id">${s.sigla}</div>
+      <div class="site-num">${s.numero}</div>
+      ${s.nome ? `<div style="font-size:.72rem;color:var(--muted);margin-top:.15rem;">${s.nome}</div>` : ''}
+      <div class="site-status">${statusLabel}</div>
+      ${item && item.obs ? `<div class="prev-issue" style="color:var(--info)">📝 ${item.obs}</div>` : ''}
+      ${prevIssue ? `<div class="prev-issue">${prevIssue}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function updateAlarmesProgress() {
+  const sites = getSites(true);
+  const itens = getItens(state.almRondaId);
+  const done = itens.length;
+  const total = sites.length;
+  const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+  document.getElementById('alarmes-progress-text').textContent = `${done} / ${total} (${pct}%)`;
+  document.getElementById('alarmes-progress-bar').style.width = pct + '%';
+}
+
+let _almSelectedStatus = null;
+function openAlmCheckModal(siteId) {
+  const site = getSiteById(siteId);
+  if (!site) return;
+  _almSelectedStatus = null;
+
+  document.getElementById('modal-alm-check-title').textContent = `${site.sigla} – ${site.numero}`;
+  document.getElementById('modal-alm-site-id').value = siteId;
+
+  const existing = getItemBySite(state.almRondaId, siteId);
+  if (existing) {
+    _almSelectedStatus = existing.status;
+    document.getElementById('modal-alm-obs').value = existing.obs || '';
+  } else {
+    document.getElementById('modal-alm-obs').value = '';
+  }
+
+  document.querySelectorAll('#alm-status-grid .status-btn').forEach(btn => {
+    btn.classList.toggle('selected', btn.dataset.val === _almSelectedStatus);
+  });
+
+  const prevResult = getLastSiteStatus(siteId, 'alarmes', state.almRondaId);
+  const prevEl = document.getElementById('modal-alm-prev-issue');
+  if (prevResult && prevResult.item.status !== 'ativado') {
+    prevEl.style.display = 'block';
+    prevEl.textContent = `⚠️ Ronda anterior (${formatDate(prevResult.ronda.data)}): ${ALM_STATUS_LABELS[prevResult.item.status]}${prevResult.item.obs ? ' – ' + prevResult.item.obs : ''}`;
+  } else {
+    prevEl.style.display = 'none';
+  }
+
+  openModal('modal-alm-check');
+}
+
+function selectAlmStatus(btn) {
+  _almSelectedStatus = btn.dataset.val;
+  document.querySelectorAll('#alm-status-grid .status-btn').forEach(b => b.classList.remove('selected'));
+  btn.classList.add('selected');
+}
+
+function saveAlmCheck() {
+  if (!_almSelectedStatus) { toast('Selecione um status', 'error'); return; }
+  const siteId = document.getElementById('modal-alm-site-id').value;
+  const obs = document.getElementById('modal-alm-obs').value.trim();
+  upsertItem({ rondaId: state.almRondaId, siteId, status: _almSelectedStatus, obs, ts: Date.now() });
+  closeModal('modal-alm-check');
+  renderAlarmesMosaicGrid();
+  renderAlarmesMosaicTabs();
+  updateAlarmesProgress();
+}
+
+function finishRondaAlarmes(conclude) {
+  const ronda = getRondaById(state.almRondaId);
+  if (!ronda) return;
+  if (conclude) {
+    ronda.status = 'concluida';
+    upsertRonda(ronda);
+    toast('Ronda de alarmes concluída!');
+    state.almRondaId = null;
+    closeRondaView('alarmes');
+  } else {
+    upsertRonda(ronda);
+    toast('Progresso salvo!');
+  }
+  renderDashboard();
+}
+
+/* ══════════════════════════════════════════════════════════════
+   HISTÓRICO
+   ══════════════════════════════════════════════════════════════ */
+function renderHistorico() {
+  const tipo = document.getElementById('hist-tipo').value;
+  const de   = document.getElementById('hist-de').value;
+  const ate  = document.getElementById('hist-ate').value;
+  const site = document.getElementById('hist-site').value.trim().toLowerCase();
+
+  let rondas = db.rondas.filter(r => {
+    if (tipo && r.tipo !== tipo) return false;
+    if (de  && r.data < de)  return false;
+    if (ate && r.data > ate) return false;
+    return true;
+  }).sort((a, b) => b.data.localeCompare(a.data));
+
+  // filter by site
+  if (site) {
+    rondas = rondas.filter(r => {
+      return db.itens.some(i => {
+        if (i.rondaId !== r.id) return false;
+        const s = getSiteById(i.siteId);
+        return s && s.sigla.toLowerCase().includes(site);
+      });
+    });
+  }
+
+  const el = document.getElementById('historico-list');
+  if (rondas.length === 0) {
+    el.innerHTML = '<div class="empty"><div class="icon">📋</div><p>Nenhuma ronda encontrada</p></div>';
+    return;
+  }
+
+  el.innerHTML = rondas.map(r => {
+    const itens = getItens(r.id);
+    const issues = itens.filter(i => isIssue(i.status, r.tipo));
+    const total = getSites(true).length;
+
+    return `<div class="card">
+      <div class="card-title">
+        <span class="chip">${r.tipo === 'cameras' ? '📷' : '🔔'}</span>
+        ${r.tipo === 'cameras' ? 'Câmeras' : 'Alarmes'} – ${formatDate(r.data)}
+        ${r.operador ? `<span style="color:var(--muted);font-weight:400;font-size:.82rem;">– ${r.operador}</span>` : ''}
+        <span style="margin-left:auto;font-weight:400;font-size:.8rem;color:${r.status==='concluida'?'var(--ok)':'var(--warn)'}">
+          ${r.status === 'concluida' ? '✔ Concluída' : '⏳ Em andamento'}
+        </span>
+        <button class="btn btn-ghost btn-sm no-print" onclick="showHistDetail('${r.id}')">🔍 Detalhes</button>
+      </div>
+      <div style="display:flex;gap:1.5rem;flex-wrap:wrap;font-size:.85rem;">
+        <span>📊 ${itens.length}/${total} verificados</span>
+        <span style="color:${issues.length>0?'var(--err)':'var(--ok)'}">
+          ${issues.length > 0 ? `⚠️ ${issues.length} problema(s)` : '✅ Sem problemas'}
+        </span>
+        ${r.obs ? `<span style="color:var(--muted)">📝 ${r.obs}</span>` : ''}
+      </div>
+      ${issues.length > 0 ? `
+        <div style="margin-top:.75rem;">
+          <div style="font-size:.78rem;color:var(--muted);margin-bottom:.35rem;">Sites com problema:</div>
+          <div style="display:flex;flex-wrap:wrap;gap:.4rem;">
+            ${issues.map(i => {
+              const s = getSiteById(i.siteId);
+              const labels = r.tipo === 'cameras' ? CAM_STATUS_LABELS : ALM_STATUS_LABELS;
+              return s ? `<span class="chip" title="${labels[i.status]}">${s.sigla}-${s.numero}</span>` : '';
+            }).join('')}
+          </div>
+        </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+function showHistDetail(rondaId) {
+  const ronda = getRondaById(rondaId);
+  if (!ronda) return;
+  const itens = getItens(rondaId);
+  const sites = getSites(true);
+  const labels = ronda.tipo === 'cameras' ? CAM_STATUS_LABELS : ALM_STATUS_LABELS;
+
+  document.getElementById('hist-detail-title').textContent =
+    `${ronda.tipo === 'cameras' ? '📷 Câmeras' : '🔔 Alarmes'} – ${formatDate(ronda.data)}${ronda.operador ? ' – ' + ronda.operador : ''}`;
+
+  // Group by mosaico
+  const mosaicos = getMosaicos();
+  let html = '';
+
+  const renderGroup = (groupSites, groupName) => {
+    if (groupSites.length === 0) return '';
+    return `<div style="margin-bottom:1rem;">
+      <div style="font-size:.85rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;">${groupName}</div>
+      <div class="table-wrap"><table>
+        <thead><tr><th>Site</th><th>Nº</th><th>Status</th><th>Observação</th></tr></thead>
+        <tbody>${groupSites.map(s => {
+          const item = itens.find(i => i.siteId === s.id);
+          const status = item ? item.status : 'pendente';
+          return `<tr>
+            <td><strong>${s.sigla}</strong></td>
+            <td>${s.numero}</td>
+            <td>${statusBadge(status, ronda.tipo)}</td>
+            <td style="color:var(--muted);font-size:.8rem;">${item && item.obs ? item.obs : '—'}</td>
+          </tr>`;
+        }).join('')}</tbody>
+      </table></div></div>`;
+  };
+
+  mosaicos.forEach(m => {
+    const mSites = sites.filter(s => s.mosaicoId === m.id);
+    html += renderGroup(mSites, m.nome);
+  });
+  const noMosaic = sites.filter(s => !s.mosaicoId);
+  if (noMosaic.length > 0) html += renderGroup(noMosaic, 'Sem Mosaico');
+
+  if (!html) html = '<div class="empty"><p>Nenhum site verificado</p></div>';
+
+  // Summary
+  const issues = itens.filter(i => isIssue(i.status, ronda.tipo));
+  html = `<div style="display:flex;gap:1rem;flex-wrap:wrap;font-size:.88rem;margin-bottom:1rem;padding:.75rem;background:var(--surface2);border-radius:var(--radius);">
+    <span>📊 <strong>${itens.length}</strong>/${sites.length} verificados</span>
+    <span style="color:${issues.length>0?'var(--err)':'var(--ok)'}"><strong>${issues.length}</strong> problema(s)</span>
+    <span style="color:var(--muted)">Status: ${ronda.status === 'concluida' ? '✔ Concluída' : '⏳ Em andamento'}</span>
+    ${ronda.obs ? `<span>📝 ${ronda.obs}</span>` : ''}
+  </div>` + html;
+
+  document.getElementById('hist-detail-body').innerHTML = html;
+  openModal('modal-hist-detail');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   EXPORT CSV
+   ══════════════════════════════════════════════════════════════ */
+function exportHistoricoCSV() {
+  const rondas = db.rondas.sort((a, b) => b.data.localeCompare(a.data));
+  const rows = [['Ronda ID','Tipo','Data','Operador','Status Ronda','Site Sigla','Site Numero','Status Item','Observação']];
+
+  rondas.forEach(r => {
+    const itens = getItens(r.id);
+    if (itens.length === 0) {
+      rows.push([r.id, r.tipo, r.data, r.operador || '', r.status, '', '', '', r.obs || '']);
+    } else {
+      itens.forEach(i => {
+        const s = getSiteById(i.siteId);
+        rows.push([r.id, r.tipo, r.data, r.operador || '', r.status,
+          s ? s.sigla : '', s ? s.numero : '', i.status, i.obs || '']);
+      });
+    }
+  });
+
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `checklist_claro_${todayISO()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+  toast('CSV exportado!');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   UTILS
+   ══════════════════════════════════════════════════════════════ */
+function todayISO() {
+  const d = new Date();
+  return d.toISOString().slice(0, 10);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   SEED DATA (first run)
+   ══════════════════════════════════════════════════════════════ */
+function seedDemoData() {
+  if (db.mosaicos.length > 0 || db.sites.length > 0) return; // already seeded
+
+  const m1 = { id: genId(), nome: 'Mosaico Centro – Página 1', ordem: 1 };
+  const m2 = { id: genId(), nome: 'Mosaico Centro – Página 2', ordem: 2 };
+  const m3 = { id: genId(), nome: 'Mosaico Norte – Página 1', ordem: 3 };
+  [m1, m2, m3].forEach(upsertMosaico);
+
+  const demoSites = [
+    { sigla:'PRPCH12', numero:'3425', nome:'Praça da República CH12', mosaicoId: m1.id },
+    { sigla:'AVPAU01', numero:'1120', nome:'Av. Paulista 01',         mosaicoId: m1.id },
+    { sigla:'AVPAU02', numero:'1121', nome:'Av. Paulista 02',         mosaicoId: m1.id },
+    { sigla:'RTBAR05', numero:'2200', nome:'Rua Barão 05',            mosaicoId: m1.id },
+    { sigla:'RTBAR06', numero:'2201', nome:'Rua Barão 06',            mosaicoId: m1.id },
+    { sigla:'VLMAD08', numero:'0880', nome:'Vila Madri 08',           mosaicoId: m1.id },
+    { sigla:'BDPRD03', numero:'4410', nome:'Bairro Perdizes 03',      mosaicoId: m2.id },
+    { sigla:'BDPRD04', numero:'4411', nome:'Bairro Perdizes 04',      mosaicoId: m2.id },
+    { sigla:'JDPAM09', numero:'5501', nome:'Jd. Pampulha 09',        mosaicoId: m2.id },
+    { sigla:'JDPAM10', numero:'5502', nome:'Jd. Pampulha 10',        mosaicoId: m2.id },
+    { sigla:'VLMAR11', numero:'6610', nome:'Vila Mariana 11',         mosaicoId: m3.id },
+    { sigla:'VLMAR12', numero:'6611', nome:'Vila Mariana 12',         mosaicoId: m3.id },
+    { sigla:'SNTAC07', numero:'7720', nome:'Santana Centro 07',       mosaicoId: m3.id },
+  ];
+
+  demoSites.forEach(s => upsertSite({ id: genId(), ativo: true, ...s }));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   INIT
+   ══════════════════════════════════════════════════════════════ */
+seedDemoData();
+renderDashboard();
+</script>
+</body>
+</html>
