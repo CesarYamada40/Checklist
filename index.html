@@ -586,7 +586,7 @@
     <input type="hidden" id="site-id">
     <div class="form-row">
       <div class="form-group">
-        <label>Sigla <span style="color:var(--muted)">(5–10 chars)</span></label>
+        <label>Sigla <span style="color:var(--muted)">(2–10 chars)</span></label>
         <input id="site-sigla" placeholder="Ex: PRPCH12" maxlength="10" style="text-transform:uppercase"
                oninput="this.value=this.value.toUpperCase()">
       </div>
@@ -731,7 +731,7 @@ function loadDB() {
   try {
     const raw = localStorage.getItem(DB_KEY);
     if (raw) return JSON.parse(raw);
-  } catch(e) { /* ignore */ }
+  } catch(e) { console.warn('CheckList: failed to load saved data, starting fresh.', e); }
   return { sites: [], mosaicos: [], rondas: [], itens: [] };
 }
 
@@ -893,7 +893,7 @@ document.querySelectorAll('.modal-overlay').forEach(overlay => {
 
 /* confirm helper */
 let _confirmCallback = null;
-function confirm(msg, cb) {
+function confirmDialog(msg, cb) {
   document.getElementById('confirm-msg').textContent = msg;
   _confirmCallback = cb;
   openModal('modal-confirm');
@@ -1125,7 +1125,7 @@ function saveSite() {
 
 function confirmDeleteSite(id) {
   const s = getSiteById(id);
-  confirm(`Excluir o site ${s.sigla}-${s.numero}? Esta ação não pode ser desfeita.`, () => {
+  confirmDialog(`Excluir o site ${s.sigla}-${s.numero}? Esta ação não pode ser desfeita.`, () => {
     deleteSite(id);
     renderSitesTable();
     toast('Site excluído.');
@@ -1227,7 +1227,7 @@ function saveMosaico() {
 
 function confirmDeleteMosaico(id) {
   const m = getMosaicoById(id);
-  confirm(`Excluir mosaico "${m.nome}"? Os sites serão desvinculados.`, () => {
+  confirmDialog(`Excluir mosaico "${m.nome}"? Os sites serão desvinculados.`, () => {
     deleteMosaico(id);
     renderMosaicosList();
     toast('Mosaico excluído.');
@@ -1280,7 +1280,7 @@ function openExistingRonda(tipo, id) {
 }
 
 function confirmDeleteRonda(id) {
-  confirm('Excluir esta ronda e todos os registros? Esta ação não pode ser desfeita.', () => {
+  confirmDialog('Excluir esta ronda e todos os registros? Esta ação não pode ser desfeita.', () => {
     deleteRonda(id);
     if (state.camRondaId === id) { state.camRondaId = null; renderCamerasView(); }
     if (state.almRondaId === id) { state.almRondaId = null; renderAlarmesView(); }
