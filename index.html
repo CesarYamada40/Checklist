@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>🎯 Checklist CFTV - Claro Regional Sul</title>
   <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/dashboard.css">
 </head>
 <body>
 
@@ -176,6 +177,66 @@
       <!-- Main Content: Sites List -->
       <main class="main-content">
 
+        <!-- Export Toolbar -->
+        <div class="export-toolbar" role="toolbar" aria-label="Ações de exportação">
+          <button class="btn btn-outline" onclick="exportExcelMultiTab()" title="Exportar Excel com abas por regional">
+            📊 Exportar Excel
+          </button>
+          <button class="btn btn-outline" onclick="exportPDF()" title="Gerar relatório PDF">
+            📄 Exportar PDF
+          </button>
+          <button class="btn btn-outline" onclick="copyExecutiveSummary()" title="Copiar resumo executivo">
+            📋 Copiar Resumo
+          </button>
+          <button class="btn btn-outline" onclick="triggerHTMLImport()" title="Importar planilha HTML regional">
+            📥 Importar HTML
+          </button>
+        </div>
+
+        <!-- Regional Summary Cards -->
+        <div id="regional-summary-cards"
+             class="regional-summary-cards"
+             role="region"
+             aria-label="Resumo por regional">
+          <!-- Rendered by dashboard.js -->
+        </div>
+
+        <!-- Dashboard Charts -->
+        <section class="dashboard-charts-section" aria-label="Gráficos do dashboard">
+          <div class="dashboard-section-title">📊 Análise por Regional</div>
+          <div class="dashboard-charts-grid">
+            <!-- Alarm status by regional -->
+            <div class="chart-panel">
+              <div class="chart-panel-title">🔔 Status de Alarmes por Regional</div>
+              <div class="chart-panel-canvas-wrap">
+                <canvas id="alarm-regional-chart" role="img" aria-label="Gráfico de barras: status de alarmes por regional"></canvas>
+              </div>
+            </div>
+            <!-- Camera status by regional -->
+            <div class="chart-panel">
+              <div class="chart-panel-title">📷 Status de Câmeras por Regional</div>
+              <div class="chart-panel-canvas-wrap">
+                <canvas id="camera-regional-chart" role="img" aria-label="Gráfico de barras: status de câmeras por regional"></canvas>
+              </div>
+            </div>
+            <!-- Top 10 problem sites -->
+            <div class="chart-panel">
+              <div class="chart-panel-title">🏆 Top 10 Sites com Problemas</div>
+              <div class="chart-panel-canvas-wrap">
+                <canvas id="top10-chart" role="img" aria-label="Gráfico horizontal: top 10 sites com mais problemas"></canvas>
+              </div>
+              <p class="chart-empty-msg hidden">🎉 Nenhum site com problemas!</p>
+            </div>
+            <!-- Problem type distribution -->
+            <div class="chart-panel">
+              <div class="chart-panel-title">🍩 Distribuição de Problemas</div>
+              <div class="chart-panel-canvas-wrap">
+                <canvas id="problem-dist-chart" role="img" aria-label="Gráfico de rosca: distribuição dos tipos de problemas"></canvas>
+              </div>
+            </div>
+          </div>
+        </section>
+
         <!-- Toolbar -->
         <div class="toolbar">
           <div class="search-wrap">
@@ -216,6 +277,11 @@
           </div>
         </div>
 
+        <!-- Active Problems Table -->
+        <div id="problems-table-section" role="region" aria-label="Tabela de problemas ativos">
+          <!-- Rendered by dashboard.js -->
+        </div>
+
       </main>
     </div>
 
@@ -254,6 +320,9 @@
   <script src="js/xlsx-import.js"></script>
   <script src="js/sync.js"></script>
   <script src="js/ronda.js"></script>
+  <script src="js/dataImporter.js"></script>
+  <script src="js/dashboard.js"></script>
+  <script src="js/exporter.js"></script>
   <script src="js/app.js"></script>
 
 </body>
