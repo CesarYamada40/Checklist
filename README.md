@@ -83,6 +83,57 @@ A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas rec
 
 Selecione os arquivos `PR.html`, `SC.html`, `RS.html` usando o botão **📥 Importar HTML**. O sistema detecta a regional automaticamente pelo nome do arquivo ou título da página.
 
+#### Estrutura esperada das planilhas HTML exportadas
+
+Os arquivos HTML podem ter:
+
+1. **Cabeçalhos nomeados** (primeira forma) – A tabela tem uma linha de cabeçalho com nomes de coluna reconhecíveis:
+
+| Col | Cabeçalho | Campo |
+|-----|-----------|-------|
+| B | CONTA | ID numérico do site |
+| C | SIGLA | Código do site (ex: PRFOZ01) |
+| D | STATUS | ONLINE / DESCONECTADO / NÃO POSSUI |
+| E | DATA | Data de desconexão (DD/MM/AA ou DD/MM/AAAA) |
+| F | O.S. / N TICKET | Número da ordem de serviço |
+| G | ZONA | Zona afetada |
+| H | STATUS 4 | Status monitoramento |
+| I | PADRÃO DE CÂMERAS | Quantidade padrão de câmeras |
+| J | ONTEM | Câmeras funcionando ontem |
+| K | HOJE | Câmeras funcionando hoje |
+| L | STATUS 2 / STATUS CFTV | OK / PARCIAL / DESCONECTADO |
+| M | DATA DA ALTERAÇÃO | Data de alteração do CFTV (DD/MM/AA ou DD/MM/AAAA) |
+| N | VEGETAÇÃO ALTA | VERDADEIRO / FALSO (ou TRUE / FALSE) |
+| O–AC | (câmeras individuais) | ⬛ escura, 🔶 obstruída, 📶 sem sinal, ❌ offline |
+| AD | O QUE HOUVE? / OBSERVAÇÃO | Observações operacionais |
+
+2. **Formato posicional fixo** (segunda forma) – Para planilhas sem cabeçalhos reconhecíveis, o sistema detecta a SIGLA automaticamente pela posição (coluna 3) e aplica o mapeamento fixo acima.
+
+> **Dicas:**
+> - A regional é auto-detectada pelo nome do arquivo (ex: `PR.html` → PR, `SC.html` → SC)
+> - Valores booleanos em português (`VERDADEIRO`/`FALSO`) são reconhecidos automaticamente
+> - Datas no formato brasileiro DD/MM/AA e DD/MM/AAAA são convertidas automaticamente
+> - Múltiplos arquivos podem ser importados de uma vez (segure Ctrl ao selecionar)
+
+#### Usando `parseRegionalHTML` programaticamente
+
+```javascript
+// Obter sites como objetos sem gravar no banco de dados
+const sites = parseRegionalHTML(htmlString, 'PR');
+console.log(sites.length, 'sites encontrados');
+
+sites.forEach(s => {
+  console.log(s.sigla, s.status_conexao, s.status2, s.observacao);
+});
+
+// O parâmetro de regional é opcional (auto-detectado se omitido)
+const sitesAutoDetect = parseRegionalHTML(htmlString);
+
+// Para importar direto no banco:
+const result = importFromHTML(htmlString, 'SC');
+console.log(`${result.imported} novos, ${result.updated} atualizados`);
+```
+
 ## 💻 Tecnologias
 
 - **[sql.js](https://github.com/sql-js/sql.js)** v1.10.3 — SQLite no navegador
