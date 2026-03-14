@@ -909,8 +909,17 @@
 @media (max-width: 768px) {
   .kpi-section { grid-template-columns: repeat(2, 1fr); gap: 8px; }
   .kpi-value   { font-size: 1.6rem; }
-  .omnisearch-wrap { max-width: 200px; }
-  .nav-tabs { display: none; }
+  .omnisearch-wrap { max-width: 160px; }
+  /* On mobile, scroll the nav tabs instead of hiding them */
+  .nav-tabs {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    flex-shrink: 1;
+    min-width: 0;
+  }
+  .nav-tabs::-webkit-scrollbar { display: none; }
+  .nav-tab { padding: 6px 10px; font-size: .75rem; }
   .period-selector { flex-direction: column; align-items: flex-start; }
   .metrics-grid { grid-template-columns: repeat(2, 1fr); }
 }

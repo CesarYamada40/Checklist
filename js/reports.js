@@ -173,7 +173,7 @@ function _renderDisponibilidade() {
   const cftvTotal  = (s.cftv_ok || 0) + (s.cftv_desconectado || 0);
   const alarmPct   = alarmTotal > 0 ? Math.round((s.alarmes_conectados || 0) / alarmTotal * 100) : 0;
   const cftvPct    = cftvTotal  > 0 ? Math.round((s.cftv_ok || 0) / cftvTotal * 100) : 0;
-  const dispGeral  = Math.round((alarmPct + cftvPct) / 2 * 10) / 10;
+  const dispGeral  = Math.round(((alarmPct + cftvPct) / 2) * 10) / 10;
 
   // Simular dados de disponibilidade diária (baseado em dados atuais)
   const diasLabels = _buildDailyLabels();
@@ -218,7 +218,7 @@ function _renderDisponibilidade() {
 
     <div style="background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:16px">
       <div style="font-size:.82rem;font-weight:700;color:var(--text-muted);margin-bottom:12px;text-transform:uppercase;letter-spacing:.05em">
-        📈 Disponibilidade por Dia — ${_getPeriodLabel()}
+        📈 Disponibilidade por Dia — ${_getPeriodLabel()} <span style="font-weight:400;text-transform:none;font-size:.72rem">(dados estimados)</span>
       </div>
       <div class="avail-bars" title="Disponibilidade diária estimada">
         ${dispDiaria.map((v, i) => {
@@ -273,6 +273,14 @@ function _buildDailyLabels() {
   return labels;
 }
 
+/**
+ * Generates SIMULATED/ESTIMATED availability data for visualization.
+ * These are not real historical measurements — they are approximations
+ * based on the current availability rate with realistic variation.
+ * @param {string[]} labels - Date labels (unused, for symmetry)
+ * @param {number}   currentPct - Current availability percentage as anchor point
+ * @returns {number[]} - Simulated daily availability values
+ */
 function _simulateAvailability(labels, currentPct) {
   // Gera variação realista em torno da disponibilidade atual
   return labels.map((_, i) => {
@@ -300,7 +308,7 @@ function _renderSLA() {
     const cftvTotal  = (s.cftv_ok || 0) + (s.cftv_desconectado || 0);
     const alarmPct   = alarmTotal > 0 ? (s.alarmes_conectados || 0) / alarmTotal * 100 : 0;
     const cftvPct    = cftvTotal  > 0 ? (s.cftv_ok || 0) / cftvTotal * 100 : 0;
-    return Math.round((alarmPct + cftvPct) / 2 * 10) / 10;
+    return Math.round(((alarmPct + cftvPct) / 2) * 10) / 10;
   }
 
   const geralDisp = calcSLA(stats);
