@@ -121,6 +121,15 @@ function showMainScreen() {
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.textContent = appState.darkMode ? '☀️' : '🌙';
   showScreen('main');
+
+  // Seed demo data on first use (dataImporter.js)
+  if (typeof seedDemoDataIfEmpty === 'function') {
+    const seeded = seedDemoDataIfEmpty();
+    if (seeded) {
+      showToast(`✅ ${seeded} sites demo carregados (PR, SC, RS)`, 'success', 4000);
+    }
+  }
+
   refreshDashboard();
   renderSitesList();
 }
@@ -153,6 +162,11 @@ function refreshDashboard() {
   renderBarChart(regionalStats);
   renderRegionalBreakdown(regionalStats);
   renderCriticos(stats.criticos);
+
+  // Enhanced dashboard components (dashboard.js)
+  if (typeof refreshEnhancedDashboard === 'function') {
+    refreshEnhancedDashboard();
+  }
 }
 
 function renderPieChart(stats) {
