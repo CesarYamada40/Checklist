@@ -13,13 +13,23 @@ let appState = {
   operador: null,
   searchQuery: '',
   activeFilter: 'todos',
+  activeRegional: 'todos',
   sortBy: 'sigla',
   chart: null,
+  barChart: null,
+  darkMode: true,
 };
 
 // ─── Init ─────────────────────────────────────────────────────────────────────
 
 document.addEventListener('DOMContentLoaded', async () => {
+  // Apply saved theme before anything else
+  const savedTheme = localStorage.getItem('cftv_theme');
+  if (savedTheme === 'light') {
+    appState.darkMode = false;
+    document.body.classList.add('light-mode');
+  }
+
   showLoadingScreen('Inicializando banco de dados...');
   try {
     await initDatabase();
@@ -107,6 +117,9 @@ function doLogout() {
 
 function showMainScreen() {
   document.getElementById('operator-name').textContent = appState.operador || '';
+  // Sync theme button label
+  const themeBtn = document.getElementById('theme-toggle');
+  if (themeBtn) themeBtn.textContent = appState.darkMode ? '☀️' : '🌙';
   showScreen('main');
   refreshDashboard();
   renderSitesList();
@@ -116,6 +129,7 @@ function showMainScreen() {
 
 function refreshDashboard() {
   const stats = getDashboardStats();
+  const regionalStats = getRegionalStats();
 
   document.getElementById('stat-total').textContent = stats.total;
   document.getElementById('stat-ok').textContent = stats.ok;
@@ -123,7 +137,21 @@ function refreshDashboard() {
   document.getElementById('stat-offline').textContent = stats.offline;
   document.getElementById('stat-nv').textContent = stats.nao_verificado;
 
+  // Extended alarm / CFTV / vegetation stats
+  const elAlConect = document.getElementById('stat-alarmes-conectados');
+  const elAlDesc = document.getElementById('stat-alarmes-desconectados');
+  const elCftvOk = document.getElementById('stat-cftv-ok');
+  const elCftvDesc = document.getElementById('stat-cftv-desconectado');
+  const elVeg = document.getElementById('stat-vegetacao');
+  if (elAlConect) elAlConect.textContent = stats.alarmes_conectados;
+  if (elAlDesc) elAlDesc.textContent = stats.alarmes_desconectados;
+  if (elCftvOk) elCftvOk.textContent = stats.cftv_ok;
+  if (elCftvDesc) elCftvDesc.textContent = stats.cftv_desconectado;
+  if (elVeg) elVeg.textContent = stats.vegetacao_alta;
+
   renderPieChart(stats);
+  renderBarChart(regionalStats);
+  renderRegionalBreakdown(regionalStats);
   renderCriticos(stats.criticos);
 }
 
@@ -187,10 +215,123 @@ function renderCriticos(criticos) {
   }).join('');
 }
 
+function renderBarChart(regionalStats) {
+  const ctx = document.getElementById('regional-chart');
+  if (!ctx) return;
+
+  if (appState.barChart) {
+    appState.barChart.destroy();
+    appState.barChart = null;
+  }
+
+  const regionais = ['PR', 'SC', 'RS'];
+  const labels = regionais.filter(r => regionalStats[r]);
+  if (!labels.length) return;
+
+  const alarmesConect = labels.map(r => regionalStats[r]?.alarmes_conectados || 0);
+  const alarmesDesc = labels.map(r => regionalStats[r]?.alarmes_desconectados || 0);
+  const cftvOk = labels.map(r => regionalStats[r]?.cftv_ok || 0);
+  const cftvDesc = labels.map(r => regionalStats[r]?.cftv_desconectado || 0);
+
+  const bodyStyle = getComputedStyle(document.body);
+  const colorText = bodyStyle.getPropertyValue('--text').trim() || '#e2e8f0';
+  const colorMuted = bodyStyle.getPropertyValue('--text-muted').trim() || '#94a3b8';
+
+  appState.barChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: '🟢 Alarmes OK',    data: alarmesConect, backgroundColor: 'rgba(16,185,129,.75)', borderRadius: 4 },
+        { label: '🔴 Alarmes Desc.', data: alarmesDesc,   backgroundColor: 'rgba(239,68,68,.75)',  borderRadius: 4 },
+        { label: '📷 CFTV OK',       data: cftvOk,        backgroundColor: 'rgba(59,130,246,.75)', borderRadius: 4 },
+        { label: '📵 CFTV Desc.',    data: cftvDesc,      backgroundColor: 'rgba(245,158,11,.75)', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          display: true,
+          position: 'bottom',
+          labels: {
+            color: colorMuted,
+            boxWidth: 12,
+            font: { size: 11 }
+          }
+        }
+      },
+      scales: {
+        x: {
+          ticks: { color: colorText },
+          grid: { color: 'rgba(255,255,255,.06)' }
+        },
+        y: {
+          ticks: { color: colorMuted },
+          grid: { color: 'rgba(255,255,255,.06)' },
+          beginAtZero: true
+        }
+      }
+    }
+  });
+}
+
+function renderRegionalBreakdown(regionalStats) {
+  const el = document.getElementById('regional-breakdown');
+  if (!el) return;
+
+  const regionais = ['PR', 'SC', 'RS'];
+  const known = regionais.filter(r => regionalStats[r]);
+
+  if (!known.length) {
+    el.innerHTML = '<p class="empty-msg">Importe planilhas para ver o resumo por regional.</p>';
+    return;
+  }
+
+  el.innerHTML = known.map(r => {
+    const s = regionalStats[r];
+    const alarmPct = s.alarmes_conectados + s.alarmes_desconectados > 0
+      ? Math.round(s.alarmes_conectados / (s.alarmes_conectados + s.alarmes_desconectados) * 100)
+      : 0;
+    const cftvPct = s.cftv_ok + s.cftv_desconectado > 0
+      ? Math.round(s.cftv_ok / (s.cftv_ok + s.cftv_desconectado) * 100)
+      : 0;
+
+    return `
+      <div class="regional-card" onclick="setRegional('${r}')" title="Filtrar por ${r}">
+        <div class="regional-card-header">
+          <span class="regional-badge regional-${r}">${r}</span>
+          <span class="regional-total">${s.total} sites</span>
+          ${s.vegetacao_alta > 0 ? `<span class="badge-veg" title="Vegetação alta">🌿 ${s.vegetacao_alta}</span>` : ''}
+        </div>
+        <div class="regional-row">
+          <span class="regional-label">🔔 Alarmes</span>
+          <span class="regional-vals">
+            <span class="ok-text">${s.alarmes_conectados}</span>
+            <span class="sep">/</span>
+            <span class="offline-text">${s.alarmes_desconectados}</span>
+            <span class="pct">${alarmPct}%</span>
+          </span>
+        </div>
+        <div class="regional-row">
+          <span class="regional-label">📷 CFTV</span>
+          <span class="regional-vals">
+            <span class="ok-text">${s.cftv_ok}</span>
+            <span class="sep">/</span>
+            <span class="offline-text">${s.cftv_desconectado}</span>
+            <span class="pct">${cftvPct}%</span>
+          </span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
 // ─── Sites List ──────────────────────────────────────────────────────────────
 
 function renderSitesList() {
-  const sites = searchSites(appState.searchQuery, appState.activeFilter);
+  const sites = searchSites(appState.searchQuery, appState.activeFilter, appState.activeRegional);
 
   const container = document.getElementById('sites-list');
 
@@ -232,6 +373,7 @@ function renderSiteCard(s) {
     s.os ? '<span class="badge-os">📋 O.S.</span>' : '',
     s.vegetacao_alta ? '<span class="badge-veg">🌿 Veg.</span>' : '',
     s.status_conexao === 'DESCONECTADO' ? '<span class="badge-disc">📵 Desc.</span>' : '',
+    s.regional ? `<span class="badge-regional badge-regional-${s.regional}">${escapeHtml(s.regional)}</span>` : '',
   ].filter(Boolean).join('');
 
   return `
@@ -435,6 +577,19 @@ function showSiteDetail(siteId) {
         </div>
 
         <div class="detail-section">
+          <h4>Observações</h4>
+          ${site.observacao ? `
+          <div class="detail-row">
+            <span style="white-space:normal;word-break:break-word;">${escapeHtml(site.observacao)}</span>
+          </div>` : '<p class="empty-msg">Sem observações</p>'}
+          ${site.regional ? `
+          <div class="detail-row">
+            <span>Regional:</span>
+            <span class="badge-regional badge-regional-${escapeHtml(site.regional)}">${escapeHtml(site.regional)}</span>
+          </div>` : ''}
+        </div>
+
+        <div class="detail-section">
           <h4>Última Ronda</h4>
           ${lastRonda ? `
           <div class="detail-row">
@@ -501,7 +656,7 @@ function triggerXLSXImport() {
     const reader = new FileReader();
     reader.onload = ev => {
       try {
-        const result = importXLSX(ev.target.result);
+        const result = importXLSX(ev.target.result, file.name);
         const msg = `✅ Importados: ${result.imported} novos, ${result.updated} atualizados, ${result.skipped} ignorados`;
         showToast(msg, 'success', 5000);
         if (result.errors.length) {
@@ -557,6 +712,27 @@ function setFilter(filter) {
     btn.classList.toggle('active', btn.dataset.filter === filter);
   });
   renderSitesList();
+}
+
+function setRegional(regional) {
+  appState.activeRegional = regional;
+  document.querySelectorAll('.regional-btn').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.regional === regional);
+  });
+  renderSitesList();
+}
+
+function toggleTheme() {
+  appState.darkMode = !appState.darkMode;
+  document.body.classList.toggle('light-mode', !appState.darkMode);
+  localStorage.setItem('cftv_theme', appState.darkMode ? 'dark' : 'light');
+  const btn = document.getElementById('theme-toggle');
+  if (btn) btn.textContent = appState.darkMode ? '☀️' : '🌙';
+  // Redraw charts with new theme colors
+  const stats = getDashboardStats();
+  const regionalStats = getRegionalStats();
+  renderPieChart(stats);
+  renderBarChart(regionalStats);
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────

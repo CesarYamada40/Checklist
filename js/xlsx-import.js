@@ -9,7 +9,7 @@
 const COLUMN_MAP = {
   conta:                   ['CONTA', 'conta', 'ID', 'id'],
   sigla:                   ['SIGLA', 'sigla', 'SITE', 'site', 'Nome', 'NOME'],
-  status_conexao:          ['STATUS', 'status', 'STATUS CONEXÃO', 'Status Conexão'],
+  status_conexao:          ['STATUS', 'status', 'STATUS CONEXÃO', 'Status Conexão', 'ALARME', 'STATUS ALARME'],
   data_desconexao:         ['DATA', 'data', 'DATA DESCONEXÃO', 'Data Desconexão'],
   os:                      ['O.S', 'OS', 'O.S.', 'os', 'Ordem de Serviço'],
   zona:                    ['ZONA', 'zona', 'Zona'],
@@ -17,13 +17,30 @@ const COLUMN_MAP = {
   padrao_cameras:          ['PADRÃO DE CÂMERAS', 'PADRAO DE CAMERAS', 'CÂMERAS', 'Cameras', 'cameras', 'Qtd Cameras'],
   cameras_ontem:           ['ONTEM', 'ontem', 'Cameras Ontem'],
   cameras_hoje:            ['HOJE', 'hoje', 'Cameras Hoje'],
-  status2:                 ['STATUS2', 'status2', 'STATUS 2'],
+  status2:                 ['STATUS2', 'status2', 'STATUS 2', 'STATUS CFTV', 'CFTV'],
   data_alteracao:          ['DATA DA ALTERAÇÃO', 'DATA DA ALTERACAO', 'Data Alteração'],
   vegetacao_alta:          ['VEGETAÇÃO ALTA', 'VEGETACAO ALTA', 'vegetacao_alta'],
   data_alteracao_vegetacao:['DATA DE ALTERAÇÃO', 'DATA DE ALTERACAO', 'Data Alt. Vegetação'],
   camera_problema:         ['CÂMERA', 'CAMERA', 'camera', 'Câmera Problema'],
   status3:                 ['STATUS3', 'status3', 'STATUS 3'],
+  regional:                ['REGIONAL', 'regional', 'ESTADO', 'UF', 'Estado'],
+  observacao:              ['OBSERVAÇÃO', 'OBSERVACAO', 'OBS', 'Observação', 'observacao', 'Obs.'],
 };
+
+/**
+ * Detect regional (PR/SC/RS) from a sheet name or file name string
+ * @param {string} sheetName
+ * @param {string} [fileName]
+ * @returns {'PR'|'SC'|'RS'|null}
+ */
+function detectRegional(sheetName, fileName) {
+  const text = `${sheetName || ''} ${fileName || ''}`.toUpperCase();
+  // Match whole-word or known state names
+  if (/\bRS\b|RIO GRANDE/.test(text)) return 'RS';
+  if (/\bSC\b|SANTA CATARINA/.test(text)) return 'SC';
+  if (/\bPR\b|PARAN[AÁ]/.test(text)) return 'PR';
+  return null;
+}
 
 /**
  * Find a value in a row by trying multiple possible column names
@@ -75,8 +92,10 @@ function parseCameras(value) {
 
 /**
  * Parse a single row from the spreadsheet into a site object
+ * @param {object} row
+ * @param {string|null} [regional] - override regional if detected from sheet/file name
  */
-function parseRow(row) {
+function parseRow(row, regional) {
   const sigla = findColumnValue(row, COLUMN_MAP.sigla);
   if (!sigla || String(sigla).trim() === '') return null;
 
@@ -97,14 +116,18 @@ function parseRow(row) {
     data_alteracao_vegetacao:excelDateToString(findColumnValue(row, COLUMN_MAP.data_alteracao_vegetacao)),
     camera_problema:         findColumnValue(row, COLUMN_MAP.camera_problema) ? String(findColumnValue(row, COLUMN_MAP.camera_problema)) : null,
     status3:                 findColumnValue(row, COLUMN_MAP.status3) || null,
+    regional:                regional || findColumnValue(row, COLUMN_MAP.regional) || null,
+    observacao:              findColumnValue(row, COLUMN_MAP.observacao) ? String(findColumnValue(row, COLUMN_MAP.observacao)) : null,
   };
 }
 
 /**
  * Import an XLSX file (ArrayBuffer) into the database
  * Returns { imported, updated, skipped, errors, sheetNames }
+ * @param {ArrayBuffer} arrayBuffer
+ * @param {string} [fileName] - original file name for regional detection
  */
-function importXLSX(arrayBuffer) {
+function importXLSX(arrayBuffer, fileName) {
   const workbook = XLSX.read(arrayBuffer, { type: 'array', cellDates: true });
 
   let imported = 0, updated = 0, skipped = 0;
@@ -123,11 +146,14 @@ function importXLSX(arrayBuffer) {
     const hasSigla = COLUMN_MAP.sigla.some(c => firstRow[c] !== undefined);
     if (!hasSigla) continue;
 
+    // Detect regional from sheet name + file name
+    const regional = detectRegional(sheetName, fileName);
+
     db.run('BEGIN TRANSACTION');
     try {
       for (const row of rows) {
         try {
-          const site = parseRow(row);
+          const site = parseRow(row, regional);
           if (!site) { skipped++; continue; }
 
           const existing = getSiteBySigla(site.sigla);
@@ -155,6 +181,7 @@ function importXLSX(arrayBuffer) {
  */
 function exportToXLSX(sites) {
   const data = sites.map(s => ({
+    'REGIONAL': s.regional || '',
     'CONTA': s.conta,
     'SIGLA': s.sigla,
     'STATUS': s.status_conexao,
@@ -171,6 +198,7 @@ function exportToXLSX(sites) {
     'DATA DE ALTERAÇÃO': s.data_alteracao_vegetacao,
     'CÂMERA': s.camera_problema,
     'STATUS3': s.status3,
+    'OBSERVAÇÃO': s.observacao || '',
     'ÚLTIMA_RONDA': s.ultima_ronda_ts || '',
     'OPERADOR': s.ultimo_operador || '',
     'ÚLTIMO_STATUS': s.ultimo_status_ronda || '',

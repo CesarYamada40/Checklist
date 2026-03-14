@@ -51,6 +51,7 @@
       <div class="operator-badge">
         👤 Operador: <strong id="operator-name">—</strong>
       </div>
+      <button id="theme-toggle" class="btn-theme" onclick="toggleTheme()" title="Alternar tema">☀️</button>
       <button class="btn-logout" onclick="doLogout()">Sair</button>
     </header>
 
@@ -59,9 +60,9 @@
       <!-- Sidebar: Dashboard -->
       <aside class="sidebar">
 
-        <!-- Stats -->
+        <!-- Stats: Ronda Status -->
         <div>
-          <div class="sidebar-section-title">📊 Dashboard</div>
+          <div class="sidebar-section-title">📊 Status das Rondas</div>
           <div class="stats-grid">
             <div class="stat-box stat-total" style="grid-column: 1/-1;">
               <div class="stat-number" id="stat-total">0</div>
@@ -86,11 +87,54 @@
           </div>
         </div>
 
+        <!-- Stats: Alarmes & CFTV -->
+        <div>
+          <div class="sidebar-section-title">🔔 Alarmes &amp; CFTV</div>
+          <div class="stats-grid">
+            <div class="stat-box stat-alarm-ok">
+              <div class="stat-number" id="stat-alarmes-conectados">0</div>
+              <div class="stat-label">🟢 Alarmes OK</div>
+            </div>
+            <div class="stat-box stat-alarm-off">
+              <div class="stat-number" id="stat-alarmes-desconectados">0</div>
+              <div class="stat-label">🔴 Alarmes Desc.</div>
+            </div>
+            <div class="stat-box stat-cftv-ok">
+              <div class="stat-number" id="stat-cftv-ok">0</div>
+              <div class="stat-label">📷 CFTV OK</div>
+            </div>
+            <div class="stat-box stat-cftv-off">
+              <div class="stat-number" id="stat-cftv-desconectado">0</div>
+              <div class="stat-label">📵 CFTV Desc.</div>
+            </div>
+            <div class="stat-box stat-veg" style="grid-column: 1/-1;">
+              <div class="stat-number" id="stat-vegetacao">0</div>
+              <div class="stat-label">🌿 Vegetação Alta</div>
+            </div>
+          </div>
+        </div>
+
         <!-- Pie Chart -->
         <div>
-          <div class="sidebar-section-title">Distribuição</div>
+          <div class="sidebar-section-title">Distribuição por Status</div>
           <div class="chart-wrap">
             <canvas id="status-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Regional Breakdown -->
+        <div>
+          <div class="sidebar-section-title">📍 Resumo por Regional</div>
+          <div id="regional-breakdown">
+            <p class="empty-msg">Carregando...</p>
+          </div>
+        </div>
+
+        <!-- Bar Chart: Regional Comparison -->
+        <div>
+          <div class="sidebar-section-title">📊 Comparativo Regional</div>
+          <div class="chart-wrap chart-wrap-bar">
+            <canvas id="regional-chart"></canvas>
           </div>
         </div>
 
@@ -110,7 +154,7 @@
             <button class="btn btn-secondary btn-full" onclick="triggerImportSync()">
               📥 Importar Sync
             </button>
-            <button class="btn btn-outline btn-full" onclick="exportToXLSX(searchSites('','todos'))">
+            <button class="btn btn-outline btn-full" onclick="exportToXLSX(searchSites('','todos','todos'))">
               📊 Exportar XLSX
             </button>
             <button class="btn btn-outline btn-full" onclick="exportDatabaseBackup()">
@@ -153,6 +197,15 @@
           <button class="filter-btn" data-filter="offline" onclick="setFilter('offline')">🔴 Offline</button>
           <button class="filter-btn" data-filter="nao_verificado" onclick="setFilter('nao_verificado')">⚫ Não Verif.</button>
           <button class="filter-btn" data-filter="os" onclick="setFilter('os')">📋 Com O.S.</button>
+          <button class="filter-btn" data-filter="vegetacao" onclick="setFilter('vegetacao')">🌿 Vegetação</button>
+        </div>
+
+        <!-- Regional Filters -->
+        <div class="filter-bar regional-filter-bar">
+          <button class="regional-btn active" data-regional="todos" onclick="setRegional('todos')">🗺️ Todas</button>
+          <button class="regional-btn regional-btn-PR" data-regional="PR" onclick="setRegional('PR')">📍 PR</button>
+          <button class="regional-btn regional-btn-SC" data-regional="SC" onclick="setRegional('SC')">📍 SC</button>
+          <button class="regional-btn regional-btn-RS" data-regional="RS" onclick="setRegional('RS')">📍 RS</button>
         </div>
 
         <!-- Sites Grid -->
