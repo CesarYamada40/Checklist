@@ -6,14 +6,14 @@
 // ─── City/Location codes per regional ────────────────────────────────────────
 
 const SIGLA_POOLS = {
-  PR: ['CWB','LDA','MGA','PGR','FOZ','CAS','PAT','CMP','ARU','GUA',
-       'PAL','UMU','FEN','SAJ','APU','MAR','COR','JAC','IBI','TLM',
-       'PTO','CAM','IGA','BAR','CLF','TAL','SBO','SJP','GER','PIN'],
-  SC: ['FNS','CHA','BLU','JOI','CRI','TUB','LGS','ARE','ITA','CAC',
+  PR: ['LDA','PCH','CWB','MGA','PGR','FOZ','CAS','PAT','CMP','ARU',
+       'GUA','PAL','UMU','FEN','SAJ','APU','MAR','COR','JAC','IBI',
+       'TLM','PTO','CAM','IGA','BAR','CLF','TAL','SBO','SJP','GER'],
+  SC: ['FNS','IDL','BLU','JOI','CRI','TUB','LGS','ARE','ITA','CAC',
        'SAO','CON','XAN','INL','SMI','TIM','MAF','JAR','CAN','FLO',
        'POO','RIO','ICR','LAG','IPO','SBO','ARA','TUP','STO','GAL'],
-  RS: ['POA','CFD','CAX','PEL','STA','CSU','GRA','IJU','SAP','URI',
-       'CRU','ERI','VIO','TRE','BPO','NOV','SBO','LIV','ALG','CAM',
+  RS: ['CBM','GTI','POA','CFD','CAX','PEL','STA','CSU','GRA','IJU',
+       'SAP','URI','CRU','ERI','VIO','TRE','BPO','NOV','LIV','ALG',
        'PAR','BAG','TAP','ENT','SAN','CRO','SAL','GUA','ALE','TOR'],
 };
 
@@ -25,13 +25,49 @@ const REGIONAL_META = {
   RS: { totalSites: 66, alarmesDesconectados: 14, cftvDesconectado: 75, cftvParcial: 8, vegetacao: 0 },
 };
 
+// ─── Known real site siglas (from operational spreadsheets) ──────────────────
+// These are seeded as the first entries for each regional to match real data.
+
+const REAL_SIGLAS = {
+  PR: [
+    { sigla: 'PRLDA79', conta: 1326 }, { sigla: 'PRPCH12', conta: 3425 },
+    { sigla: 'PRCWB01', conta: 1401 }, { sigla: 'PRCWB02', conta: 1402 },
+    { sigla: 'PRMGA03', conta: 1503 }, { sigla: 'PRPGR04', conta: 1604 },
+  ],
+  SC: [
+    { sigla: 'SCFNSJ7', conta: 1542 }, { sigla: 'SCIDL08', conta: 1789 },
+    { sigla: 'SCBLU01', conta: 1601 }, { sigla: 'SCJOI02', conta: 1702 },
+    { sigla: 'SCCRI03', conta: 1803 }, { sigla: 'SCTUB04', conta: 1904 },
+  ],
+  RS: [
+    { sigla: 'RSCBM04', conta: 1015 }, { sigla: 'RSGTI15', conta: 2156 },
+    { sigla: 'RSPOA01', conta: 2001 }, { sigla: 'RSCFD02', conta: 2102 },
+    { sigla: 'RSCAX03', conta: 2203 }, { sigla: 'RSPEL05', conta: 2305 },
+  ],
+};
+
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
 function _genSigla(regional, index) {
+  // Use known real siglas for the first few entries
+  const realList = REAL_SIGLAS[regional] || [];
+  if (index < realList.length) return realList[index].sigla;
+
   const pool = SIGLA_POOLS[regional] || ['SIT'];
-  const cityCode = pool[index % pool.length];
-  const num = String((Math.floor(index / pool.length) * pool.length + (index % pool.length) + 1) % 100).padStart(2, '0');
+  const adjustedIndex = index - realList.length;
+  const cityCode = pool[adjustedIndex % pool.length];
+  // Sequential number within each city code group (1-based, wraps at 99)
+  const seqInGroup = (adjustedIndex % pool.length) + 1;
+  const groupCycle = Math.floor(adjustedIndex / pool.length);
+  const num = String(((groupCycle * pool.length + seqInGroup) % 100) || 1).padStart(2, '0');
   return `${regional}${cityCode}${num}`;
+}
+
+function _genConta(regional, index) {
+  const realList = REAL_SIGLAS[regional] || [];
+  if (index < realList.length) return realList[index].conta;
+  const baseContaOffset = regional === 'PR' ? 0 : regional === 'SC' ? 100 : 200;
+  return 1300 + baseContaOffset + index;
 }
 
 function _genCameras(index) {
@@ -57,8 +93,7 @@ function _generateRegionalSites(regional) {
 
   for (let i = 0; i < meta.totalSites; i++) {
     const sigla = _genSigla(regional, i);
-    const baseContaOffset = regional === 'PR' ? 0 : regional === 'SC' ? 100 : 200;
-    const conta = 1300 + baseContaOffset + i;
+    const conta = _genConta(regional, i);
     const padrao = _genCameras(i);
 
     // Alarm connection status
