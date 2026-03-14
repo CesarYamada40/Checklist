@@ -339,6 +339,32 @@ function getLastRondaBySite(siteId) {
   return row;
 }
 
+/**
+ * Retrieve the most recent rondas across all sites, with site sigla joined.
+ * @param {number} [limit=100]
+ * @returns {object[]}
+ */
+function getRondasRecentes(limit = 100) {
+  try {
+    const stmt = db.prepare(
+      `SELECT r.*, s.sigla, s.regional,
+         (SELECT COUNT(*) FROM rondas r2 WHERE r2.site_id = r.site_id AND r2.status != 'OK' AND r2.timestamp = r.timestamp) AS problemas,
+         1 AS total_sites
+       FROM rondas r
+       LEFT JOIN sites s ON s.id = r.site_id
+       ORDER BY r.timestamp DESC
+       LIMIT ?`
+    );
+    stmt.bind([limit]);
+    const rows = [];
+    while (stmt.step()) rows.push(stmt.getAsObject());
+    stmt.free();
+    return rows;
+  } catch (_) {
+    return [];
+  }
+}
+
 // ─── Dashboard Stats ─────────────────────────────────────────────────────────
 
 function getDashboardStats() {

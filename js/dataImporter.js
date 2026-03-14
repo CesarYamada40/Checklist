@@ -506,39 +506,350 @@ function importHTMLFile(file, regional) {
 }
 
 /**
- * Open file picker and import one or more HTML regional files.
- * Refreshes dashboard and site list on completion.
+ * Open the drag-and-drop HTML import modal.
+ * Shows a preview of the data before importing.
  */
 function triggerHTMLImport() {
-  const input = document.createElement('input');
-  input.type = 'file';
-  input.accept = '.html,.htm';
-  input.multiple = true;
-  input.onchange = async e => {
-    const files = Array.from(e.target.files);
-    if (!files.length) return;
+  _showImporterModal();
+}
 
-    showToast('⏳ Importando arquivos HTML...', 'info', 2000);
-    let totalImported = 0, totalUpdated = 0, totalSkipped = 0;
-    const errors = [];
+// ─── Importer Modal ───────────────────────────────────────────────────────────
 
-    for (const file of files) {
-      try {
-        const r = await importHTMLFile(file);
-        totalImported += r.imported;
-        totalUpdated  += r.updated;
-        totalSkipped  += r.skipped;
-        if (r.errors.length) errors.push(...r.errors);
-      } catch (err) {
-        errors.push(`${file.name}: ${err.message}`);
-      }
+const _importerState = {
+  files:        [],
+  previewed:    [],
+  strategy:     'mesclar', // 'mesclar' | 'sobrescrever' | 'apenas_novos'
+  loading:      false,
+  result:       null,
+};
+
+/**
+ * Renders and shows the drag-and-drop HTML importer modal.
+ */
+function _showImporterModal() {
+  _importerState.files     = [];
+  _importerState.previewed = [];
+  _importerState.result    = null;
+
+  // Remove any existing modal
+  const existing = document.getElementById('importer-modal-overlay');
+  if (existing) existing.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id        = 'importer-modal-overlay';
+  overlay.className = 'importer-modal-overlay';
+  overlay.setAttribute('role', 'dialog');
+  overlay.setAttribute('aria-modal', 'true');
+  overlay.setAttribute('aria-labelledby', 'importer-modal-title');
+
+  overlay.innerHTML = `
+    <div class="importer-modal" id="importer-modal">
+      <div class="importer-modal-header">
+        <span class="importer-modal-title" id="importer-modal-title">📥 Importar Planilhas Regionais</span>
+        <button class="importer-modal-close" onclick="_closeImporterModal()" aria-label="Fechar">✕</button>
+      </div>
+      <div class="importer-modal-body">
+        <!-- Drop Zone -->
+        <div class="drop-zone" id="importer-drop-zone"
+          onclick="document.getElementById('importer-file-input').click()"
+          ondragover="_importerDragOver(event)"
+          ondragleave="_importerDragLeave(event)"
+          ondrop="_importerDrop(event)"
+          tabindex="0"
+          role="button"
+          aria-label="Zona de arrastar e soltar arquivos HTML"
+          onkeydown="if(e.key==='Enter'||e.key===' ')document.getElementById('importer-file-input').click()">
+          <div class="drop-zone-icon">📂</div>
+          <div class="drop-zone-label">Arraste os arquivos SC.html e RS.html aqui</div>
+          <div class="drop-zone-sub">ou clique para selecionar · Aceita .html e .htm</div>
+        </div>
+        <input type="file" id="importer-file-input" accept=".html,.htm" multiple style="display:none"
+          onchange="_importerFilesSelected(event)">
+
+        <!-- File pills -->
+        <div class="file-pills" id="importer-file-pills"></div>
+
+        <!-- Import strategy options -->
+        <div class="import-options">
+          <label class="import-option">
+            <input type="radio" name="import-strategy" value="mesclar" checked
+              onchange="_importerState.strategy='mesclar'">
+            <div>
+              <div class="import-option-label">🔄 Mesclar (Recomendado)</div>
+              <div class="import-option-desc">Atualiza sites existentes e cria os novos</div>
+            </div>
+          </label>
+          <label class="import-option">
+            <input type="radio" name="import-strategy" value="apenas_novos"
+              onchange="_importerState.strategy='apenas_novos'">
+            <div>
+              <div class="import-option-label">➕ Apenas Novos</div>
+              <div class="import-option-desc">Cria apenas sites que ainda não existem</div>
+            </div>
+          </label>
+          <label class="import-option">
+            <input type="radio" name="import-strategy" value="sobrescrever"
+              onchange="_importerState.strategy='sobrescrever'">
+            <div>
+              <div class="import-option-label">⚠️ Sobrescrever</div>
+              <div class="import-option-desc">Substitui todos os dados dos sites importados</div>
+            </div>
+          </label>
+        </div>
+
+        <!-- Preview -->
+        <div class="import-preview" id="importer-preview" style="display:none">
+          <div class="import-preview-title">👁 Preview dos dados</div>
+          <div class="import-preview-table-wrap">
+            <table class="import-preview-table" id="importer-preview-table">
+              <thead>
+                <tr>
+                  <th>Sigla</th>
+                  <th>Conta</th>
+                  <th>Regional</th>
+                  <th>Status Alarme</th>
+                  <th>Status CFTV</th>
+                  <th>Câmeras</th>
+                </tr>
+              </thead>
+              <tbody id="importer-preview-body"></tbody>
+            </table>
+          </div>
+          <div id="importer-preview-count" style="font-size:.75rem;color:var(--text-muted);margin-top:6px"></div>
+        </div>
+
+        <!-- Progress -->
+        <div class="import-progress" id="importer-progress" style="display:none">
+          <div class="import-progress-text" id="importer-progress-text">Processando...</div>
+          <div class="import-progress-bar">
+            <div class="import-progress-fill" id="importer-progress-fill" style="width:0%"></div>
+          </div>
+        </div>
+
+        <!-- Result -->
+        <div class="import-result" id="importer-result" style="display:none"></div>
+      </div>
+      <div class="importer-modal-footer">
+        <button class="btn btn-outline" onclick="_closeImporterModal()">Cancelar</button>
+        <button class="btn btn-secondary" id="importer-preview-btn"
+          onclick="_importerDoPreview()" style="display:none">👁 Preview</button>
+        <button class="btn btn-primary" id="importer-import-btn"
+          onclick="_importerDoImport()" style="display:none">✅ Importar</button>
+      </div>
+    </div>
+  `;
+
+  document.body.appendChild(overlay);
+
+  // Close on overlay click
+  overlay.addEventListener('click', e => {
+    if (e.target === overlay) _closeImporterModal();
+  });
+
+  // Trap focus in modal
+  const modal = overlay.querySelector('.importer-modal');
+  if (modal) modal.querySelector('.importer-modal-close').focus();
+}
+
+function _closeImporterModal() {
+  const overlay = document.getElementById('importer-modal-overlay');
+  if (overlay) overlay.remove();
+}
+
+function _importerDragOver(e) {
+  e.preventDefault();
+  document.getElementById('importer-drop-zone').classList.add('dragover');
+}
+
+function _importerDragLeave(e) {
+  document.getElementById('importer-drop-zone').classList.remove('dragover');
+}
+
+function _importerDrop(e) {
+  e.preventDefault();
+  document.getElementById('importer-drop-zone').classList.remove('dragover');
+  const files = Array.from(e.dataTransfer.files).filter(f => /\.html?$/i.test(f.name));
+  if (files.length) _importerAddFiles(files);
+}
+
+function _importerFilesSelected(e) {
+  const files = Array.from(e.target.files);
+  if (files.length) _importerAddFiles(files);
+}
+
+function _importerAddFiles(newFiles) {
+  // Merge, avoiding duplicates by name
+  const existing = _importerState.files.map(f => f.name);
+  newFiles.forEach(f => {
+    if (!existing.includes(f.name)) _importerState.files.push(f);
+  });
+  _importerRenderPills();
+  _importerRenderButtons();
+  _importerDoPreview();
+}
+
+function _importerRenderPills() {
+  const container = document.getElementById('importer-file-pills');
+  if (!container) return;
+  container.innerHTML = _importerState.files.map((f, i) => `
+    <div class="file-pill">
+      📄 ${escapeHtml(f.name)}
+      <button class="file-pill-remove" onclick="_importerRemoveFile(${i})" aria-label="Remover ${escapeHtml(f.name)}">✕</button>
+    </div>
+  `).join('');
+}
+
+function _importerRemoveFile(idx) {
+  _importerState.files.splice(idx, 1);
+  _importerRenderPills();
+  _importerRenderButtons();
+  if (!_importerState.files.length) {
+    const preview = document.getElementById('importer-preview');
+    if (preview) preview.style.display = 'none';
+  } else {
+    _importerDoPreview();
+  }
+}
+
+function _importerRenderButtons() {
+  const hasFiles = _importerState.files.length > 0;
+  const previewBtn = document.getElementById('importer-preview-btn');
+  const importBtn  = document.getElementById('importer-import-btn');
+  if (previewBtn) previewBtn.style.display = hasFiles ? '' : 'none';
+  if (importBtn)  importBtn.style.display  = hasFiles ? '' : 'none';
+}
+
+async function _importerDoPreview() {
+  if (!_importerState.files.length) return;
+  const previewSection = document.getElementById('importer-preview');
+  const tbody          = document.getElementById('importer-preview-body');
+  const countEl        = document.getElementById('importer-preview-count');
+  if (!previewSection || !tbody) return;
+
+  // Parse first file for preview
+  const file = _importerState.files[0];
+  try {
+    const text = await file.text();
+    const reg = typeof detectRegional !== 'undefined' ? detectRegional('', file.name) : null;
+    const sites = parseRegionalHTML(text, reg);
+    _importerState.previewed = sites;
+
+    tbody.innerHTML = sites.slice(0, 20).map(s => `
+      <tr>
+        <td>${escapeHtml(s.sigla || '-')}</td>
+        <td>${escapeHtml(String(s.conta || '-'))}</td>
+        <td>${escapeHtml(s.regional || '-')}</td>
+        <td>${escapeHtml(s.status_conexao || '-')}</td>
+        <td>${escapeHtml(s.status2 || '-')}</td>
+        <td>${s.cameras_hoje !== null && s.cameras_hoje !== undefined ? escapeHtml(String(s.cameras_hoje)) : '-'}/${s.padrao_cameras || '-'}</td>
+      </tr>
+    `).join('');
+
+    if (countEl) {
+      const extra = sites.length > 20 ? ` (mostrando 20 de ${sites.length})` : '';
+      countEl.textContent = `${sites.length} sites encontrados no arquivo${extra}`;
     }
+    previewSection.style.display = '';
+  } catch (err) {
+    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--offline);padding:8px">Erro ao fazer preview: ${escapeHtml(err.message)}</td></tr>`;
+    previewSection.style.display = '';
+  }
+}
 
-    showToast(`✅ HTML: ${totalImported} novos, ${totalUpdated} atualizados, ${totalSkipped} ignorados`, 'success', 5000);
-    if (errors.length) console.warn('[HTML import errors]', errors);
+async function _importerDoImport() {
+  if (!_importerState.files.length) return;
+  _importerState.loading = true;
 
-    refreshDashboard();
-    renderSitesList();
-  };
-  input.click();
+  const progressSection = document.getElementById('importer-progress');
+  const progressFill    = document.getElementById('importer-progress-fill');
+  const progressText    = document.getElementById('importer-progress-text');
+  const importBtn       = document.getElementById('importer-import-btn');
+  const resultEl        = document.getElementById('importer-result');
+
+  if (progressSection) progressSection.style.display = '';
+  if (importBtn) importBtn.disabled = true;
+
+  let totalImported = 0, totalUpdated = 0, totalSkipped = 0;
+  const allErrors   = [];
+  const total       = _importerState.files.length;
+
+  for (let i = 0; i < total; i++) {
+    const file = _importerState.files[i];
+    const pct  = Math.round(((i + 1) / total) * 100);
+    if (progressFill) progressFill.style.width = `${pct}%`;
+    if (progressText) progressText.textContent = `Importando ${file.name} (${i + 1}/${total})...`;
+
+    try {
+      const text = await file.text();
+      const reg  = typeof detectRegional !== 'undefined' ? detectRegional('', file.name) : null;
+      const r    = importFromHTML(text, reg);
+
+      totalImported += r.imported;
+      totalUpdated  += r.updated;
+      totalSkipped  += r.skipped;
+      if (r.errors && r.errors.length) allErrors.push(...r.errors.map(e => `${file.name}: ${e}`));
+    } catch (err) {
+      allErrors.push(`${file.name}: ${err.message}`);
+    }
+  }
+
+  // Registro de auditoria
+  if (typeof auditLog === 'function') {
+    auditLog('import', `Importação HTML: ${totalImported} novos, ${totalUpdated} atualizados, ${totalSkipped} ignorados`);
+  }
+
+  if (progressFill)  progressFill.style.width  = '100%';
+  if (progressText)  progressText.textContent  = 'Concluído!';
+
+  // Mostrar resultado
+  if (resultEl) {
+    resultEl.style.display = '';
+    resultEl.innerHTML = `
+      <div class="import-result-row">
+        <span>✅ Sites novos criados:</span>
+        <span style="color:var(--ok)">${totalImported}</span>
+      </div>
+      <div class="import-result-row">
+        <span>🔄 Sites atualizados:</span>
+        <span style="color:var(--accent)">${totalUpdated}</span>
+      </div>
+      <div class="import-result-row">
+        <span>⏭️ Linhas ignoradas:</span>
+        <span style="color:var(--text-muted)">${totalSkipped}</span>
+      </div>
+      ${allErrors.length ? `
+      <div class="import-result-row">
+        <span>⚠️ Erros:</span>
+        <span style="color:var(--offline)">${allErrors.length}</span>
+      </div>` : ''}
+    `;
+  }
+
+  if (importBtn) {
+    importBtn.textContent = '✅ Fechar';
+    importBtn.disabled    = false;
+    importBtn.onclick     = () => {
+      _closeImporterModal();
+      refreshDashboard();
+      renderSitesList();
+    };
+  }
+
+  // Also update a "Cancel" button to "Fechar"
+  const cancelBtn = document.querySelector('#importer-modal-overlay .btn-outline');
+  if (cancelBtn) {
+    cancelBtn.textContent = 'Fechar';
+    cancelBtn.onclick     = () => {
+      _closeImporterModal();
+      refreshDashboard();
+      renderSitesList();
+    };
+  }
+
+  showToast(
+    `✅ Importação concluída: ${totalImported} novos, ${totalUpdated} atualizados`,
+    'success', 4000
+  );
+
+  _importerState.loading = false;
 }
