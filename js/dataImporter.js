@@ -186,7 +186,8 @@ function importFromHTML(htmlContent, regional) {
     if (!headerTexts) continue;
 
     // Detect regional from doc title or file content
-    const detectedRegional = regional || detectRegional(doc.title, '');
+    const detectedRegional = regional ||
+      (typeof detectRegional === 'function' ? detectRegional(doc.title, '') : null);
 
     // Map field → column index using COLUMN_MAP from xlsx-import.js
     const colIndex = {};

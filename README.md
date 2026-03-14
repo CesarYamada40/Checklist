@@ -5,35 +5,48 @@ Aplicação web para checklist de sites de câmeras CFTV da Claro, focada em agi
 ## ✅ Funcionalidades
 
 - **Login de operador** — Identifica quem fez cada ronda
+- **Dados demo automáticos** — Ao primeiro login, 235 sites das 3 regionais (PR, SC, RS) são carregados automaticamente para demonstração
 - **Importação de XLSX** — Carrega a planilha de sites automaticamente, detectando a regional (PR/SC/RS) pelo nome da aba ou do arquivo
-- **Dashboard em tempo real** — Total de sites, OK / Parcial / Offline / Não Verificado, gráfico de pizza e sites críticos
+- **Importação de HTML** — Importa diretamente as planilhas HTML exportadas das regionais (PR.html, SC.html, RS.html)
+- **Dashboard aprimorado** — Cards de resumo por regional no topo, métricas em tempo real e gráficos interativos
+- **4 Cards de Resumo** — PR, SC, RS e Geral com barras de progresso de alarmes e CFTV
+- **4 Gráficos interativos (Chart.js)**:
+  - Status de alarmes por regional (barras empilhadas)
+  - Status de câmeras por regional (barras agrupadas)
+  - Top 10 sites com mais problemas (barras horizontais)
+  - Distribuição de tipos de problemas (rosca/doughnut)
+- **Tabela de Problemas Ativos** — Paginação (10/página), ordenação por coluna, filtros por regional e tipo de problema, busca por SIGLA
+- **Exportar Excel (multi-abas)** — Gera arquivo XLSX com abas: Regional PR, Regional SC, Regional RS, Consolidado e Resumo
+- **Exportar PDF** — Relatório imprimível com estatísticas e tabela de problemas
+- **Copiar Resumo** — Copia um resumo executivo para a área de transferência
 - **Métricas de Alarmes & CFTV** — Alarmes conectados/desconectados, CFTV OK/desconectado, Vegetação Alta direto no painel
-- **Resumo por Regional** — Cards com estatísticas individuais de PR, SC e RS (alarmes + CFTV + vegetação)
-- **Gráfico comparativo regional** — Barras mostrando alarmes e CFTV por regional lado a lado
+- **Resumo por Regional (sidebar)** — Cards com estatísticas individuais de PR, SC e RS
+- **Gráfico comparativo regional** — Barras mostrando alarmes e CFTV por regional
 - **Filtros por regional** — Botões PR / SC / RS para exibir apenas sites de uma regional
-- **Filtro de vegetação** — Filtrar sites com vegetação alta
 - **Tema claro/escuro** — Toggle ☀️/🌙 com persistência em LocalStorage
 - **Modo Ronda rápida** — Interface focada: um site por vez com botões grandes e atalhos de teclado
   - `Espaço` / `Enter` = OK · `P` = Parcial · `O` = Offline · `S` = Pular
   - Modal para registrar câmeras parciais e observação
-- **Marcação rápida** — Botões ✅ ⚠️ ❌ diretamente nos cards da lista
-- **Badge regional** — Cada card de site exibe a regional (PR/SC/RS) com cores distintas
+- **Marcação rápida** — Botões ✅ ⚠️ ❌ diretamente nos cards e na tabela de problemas
 - **Busca e filtros** — Por sigla, conta ou status (OK / Parcial / Offline / Não Verificado / Com O.S. / Vegetação)
-- **Detalhes do site** — Histórico das últimas 10 rondas, observações e regional do site
-- **Sincronização multi-usuário** — Exportar/importar JSON para compartilhar rondas via WhatsApp ou e-mail
-- **Exportar relatório** — JSON da ronda finalizada com resumo e sites com problemas
-- **Exportar XLSX** — Planilha atualizada com dados da última ronda (inclui coluna REGIONAL e OBSERVAÇÃO)
+- **Detalhes do site** — Histórico das últimas 10 rondas, observações e regional
+- **Sincronização multi-usuário** — Exportar/importar JSON para compartilhar rondas
 - **Backup automático** — LocalStorage a cada 5 minutos + backup de DB SQLite
+- **Acessibilidade** — ARIA labels, navegação por teclado, contraste WCAG AA
+- **Responsivo** — Layout adaptado para mobile (320px), tablet (768px) e desktop
 
 ## 🚀 Como Usar
 
 1. Abra `index.html` no Chrome, Edge ou Firefox (versão 90+)
 2. Digite seu nome e clique **Entrar**
-3. Clique **📥 Importar XLSX** e selecione a planilha de checklist
-   - O sistema detecta automaticamente a regional pelo nome da aba (ex: "PR", "SC", "RS") ou pelo nome do arquivo
-4. Clique **🚀 Iniciar Ronda** para começar a verificação
-5. Use os botões ou atalhos de teclado para marcar cada site
-6. Ao finalizar, clique **📤 Exportar Relatório** e compartilhe com a equipe
+   - 235 sites demo serão carregados automaticamente (PR: 86, SC: 83, RS: 66)
+3. Para importar dados reais:
+   - Clique **📥 Importar XLSX** para planilhas Excel/CSV
+   - Clique **📥 Importar HTML** para planilhas HTML das regionais
+4. Explore o dashboard: cards de resumo, gráficos e tabela de problemas ativos
+5. Use os botões de exportação: **📊 Exportar Excel**, **📄 Exportar PDF** ou **📋 Copiar Resumo**
+6. Clique **🚀 Iniciar Ronda** para começar a verificação
+7. Ao finalizar, clique **📤 Exportar Sync** e compartilhe com a equipe
 
 ## 🔄 Sincronização entre Operadores
 
@@ -42,7 +55,9 @@ Aplicação web para checklist de sites de câmeras CFTV da Claro, focada em agi
 3. **Operador B** clica **📥 Importar Sync** e seleciona o arquivo
 4. As rondas são mescladas automaticamente (ronda mais recente prevalece)
 
-## 🗃️ Estrutura da Planilha XLSX
+## 📥 Como Importar Dados das Regionais
+
+### Formato XLSX
 
 A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas reconhecidas automaticamente:
 
@@ -54,7 +69,6 @@ A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas rec
 | DATA | Timestamp de desconexão |
 | O.S | Ordem de serviço aberta |
 | ZONA | Número da zona com problema |
-| STATUS4 | ABERTA / ANULADA |
 | PADRÃO DE CÂMERAS | Quantidade esperada |
 | ONTEM | Câmeras funcionando ontem |
 | HOJE | Câmeras funcionando hoje |
@@ -65,11 +79,15 @@ A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas rec
 
 > **Dica de detecção de regional:** Se a aba da planilha ou o nome do arquivo contiver "PR", "Paraná", "SC", "Santa Catarina", "RS" ou "Rio Grande", a regional é atribuída automaticamente a todos os sites daquela aba.
 
+### Formato HTML
+
+Selecione os arquivos `PR.html`, `SC.html`, `RS.html` usando o botão **📥 Importar HTML**. O sistema detecta a regional automaticamente pelo nome do arquivo ou título da página.
+
 ## 💻 Tecnologias
 
 - **[sql.js](https://github.com/sql-js/sql.js)** v1.10.3 — SQLite no navegador
 - **[SheetJS](https://sheetjs.com/)** v0.18.5 — Leitura e escrita de XLSX
-- **[Chart.js](https://www.chartjs.org/)** v4.4.0 — Gráficos (pizza + barras)
+- **[Chart.js](https://www.chartjs.org/)** v4.4.0 — Gráficos interativos
 - HTML + CSS + JavaScript puro (sem framework, sem servidor)
 
 ## 📁 Estrutura de Arquivos
@@ -78,11 +96,15 @@ A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas rec
 /
 ├── index.html          # Interface principal
 ├── css/
-│   └── styles.css      # Design (dark/light theme)
+│   ├── styles.css      # Design (dark/light theme)
+│   └── dashboard.css   # Estilos do dashboard aprimorado
 ├── js/
 │   ├── app.js          # Controlador principal
 │   ├── database.js     # Wrapper SQLite (sql.js)
-│   ├── xlsx-import.js  # Importação de planilhas
+│   ├── xlsx-import.js  # Importação de planilhas XLSX
+│   ├── dataImporter.js # Importação de HTML + dados demo
+│   ├── dashboard.js    # Cards, gráficos e tabela de problemas
+│   ├── exporter.js     # Exportação Excel/PDF/Clipboard
 │   ├── ronda.js        # Modo ronda
 │   └── sync.js         # Exportar/importar JSON
 └── README.md

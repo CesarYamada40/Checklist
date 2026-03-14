@@ -4,6 +4,11 @@
  * Depends on: database.js, app.js, chart.umd.min.js
  */
 
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const CAM_PROBLEM_OFFLINE  = '❌';
+const CAM_PROBLEM_PARTIAL  = '🔶';
+
 // ─── Dashboard State ──────────────────────────────────────────────────────────
 
 const dashState = {
@@ -328,7 +333,7 @@ function renderTop10Chart() {
   dashState.charts.top10 = new Chart(ctx, {
     type: 'bar',
     data: {
-      labels: scored.map(s => `${s.sigla}${s.regional ? ' (' + s.regional + ')' : ''}`),
+      labels: scored.map(s => `${s.sigla}${s.regional ? ` (${s.regional})` : ''}`),
       datasets: [{
         label: 'Problemas',
         data: scored.map(s => s.score),
@@ -425,7 +430,7 @@ function _getProblemDesc(s) {
       ? ` (${s.cameras_hoje}/${s.padrao_cameras})` : '';
     parts.push(`🟡 Parcial${cam}`);
   }
-  if (s.camera_problema && s.camera_problema !== '❌' && s.camera_problema !== '🔶')
+  if (s.camera_problema && s.camera_problema !== CAM_PROBLEM_OFFLINE && s.camera_problema !== CAM_PROBLEM_PARTIAL)
     parts.push(s.camera_problema);
   if (s.ultimo_status_ronda === 'DESCONECTADO') parts.push('❌ Ronda Off.');
   if (s.vegetacao_alta) parts.push('🌿 Vegetação');

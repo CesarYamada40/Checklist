@@ -150,8 +150,8 @@ function exportPDF() {
     }).join('');
 
     // Top 30 problem sites
-    const problems = typeof _getProblemSites === 'function' ? _getProblemSites().slice(0, 30) : [];
-    const problemRows = problems.map(s => `<tr>
+    const problemSites = typeof _getProblemSites === 'function' ? _getProblemSites().slice(0, 30) : [];
+    const problemRows = problemSites.map(s => `<tr>
       <td>${escapeHtml(s.regional || '-')}</td>
       <td><strong>${escapeHtml(s.sigla)}</strong></td>
       <td>${s.conta || '-'}</td>
@@ -233,8 +233,8 @@ function exportPDF() {
     <tbody>${tableRows}</tbody>
   </table>
 
-  ${problems.length ? `
-  <h2>⚠️ Problemas Ativos (Top ${problems.length})</h2>
+  ${problemSites.length ? `
+  <h2>⚠️ Problemas Ativos (Top ${problemSites.length})</h2>
   <table>
     <thead>
       <tr>
