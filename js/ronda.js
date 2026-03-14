@@ -3,6 +3,11 @@
  * Handles start, navigation, marking status, and finishing a ronda
  */
 
+// Number of recent rondas to check when detecting recurring problems
+const RONDA_RECURRENCE_WINDOW = 5;
+// Minimum problem count within the window to be flagged as recurrent
+const RONDA_RECURRENCE_MIN = 3;
+
 let rondaState = {
   active: false,
   sites: [],          // full list of sites for this ronda
@@ -181,11 +186,11 @@ function _buildRondaAlerts(site, recentRondas) {
 
   // Vegetação alta
   if (site.vegetacao_alta) {
-    const vegDate = site.data_alteracao_vegetacao
-      ? ` desde ${_fmtDateRonda(site.data_alteracao_vegetacao)}` : '';
+    const vegDateFormatted = site.data_alteracao_vegetacao
+      ? ` desde ${escapeHtml(_fmtDateRonda(site.data_alteracao_vegetacao))}` : '';
     alerts.push({
       icon: '🌿',
-      text: `Vegetação alta reportada${escapeHtml(vegDate)}`,
+      text: `Vegetação alta reportada${vegDateFormatted}`,
       cls: 'ronda-alert-veg',
     });
   }
@@ -213,7 +218,7 @@ function _buildRondaAlerts(site, recentRondas) {
 
   // Recorrência: 3 ou mais das últimas rondas com problema
   const problemCount = recentRondas.filter(r => r.status !== 'OK').length;
-  if (problemCount >= 3) {
+  if (problemCount >= RONDA_RECURRENCE_MIN) {
     alerts.push({
       icon: '🔄',
       text: `Problema recorrente — ${problemCount} das últimas ${recentRondas.length} rondas com falha`,
@@ -298,7 +303,7 @@ function renderRondaScreen() {
 
   // Get last ronda info and recent history for this site
   const lastRonda   = getLastRondaBySite(site.id);
-  const recentRondas = getRondasBySite(site.id, 5);
+  const recentRondas = getRondasBySite(site.id, RONDA_RECURRENCE_WINDOW);
 
   const lastStatus  = lastRonda ? lastRonda.status : null;
   const lastTs      = lastRonda ? formatDateTime(lastRonda.timestamp) : 'Nunca';

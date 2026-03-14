@@ -56,7 +56,10 @@ function _genSigla(regional, index) {
   const pool = SIGLA_POOLS[regional] || ['SIT'];
   const adjustedIndex = index - realList.length;
   const cityCode = pool[adjustedIndex % pool.length];
-  const num = String(((Math.floor(adjustedIndex / pool.length) * pool.length + (adjustedIndex % pool.length) + 1) % 100) || 1).padStart(2, '0');
+  // Sequential number within each city code group (1-based, wraps at 99)
+  const seqInGroup = (adjustedIndex % pool.length) + 1;
+  const groupCycle = Math.floor(adjustedIndex / pool.length);
+  const num = String(((groupCycle * pool.length + seqInGroup) % 100) || 1).padStart(2, '0');
   return `${regional}${cityCode}${num}`;
 }
 
