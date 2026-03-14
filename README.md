@@ -4,36 +4,72 @@ Aplicação web para checklist de sites de câmeras CFTV da Claro, focada em agi
 
 ## ✅ Funcionalidades
 
-- **Login de operador** — Identifica quem fez cada ronda
-- **Dados demo automáticos** — Ao primeiro login, 235 sites das 3 regionais (PR, SC, RS) são carregados automaticamente para demonstração
-- **Importação de XLSX** — Carrega a planilha de sites automaticamente, detectando a regional (PR/SC/RS) pelo nome da aba ou do arquivo
-- **Importação de HTML** — Importa diretamente as planilhas HTML exportadas das regionais (PR.html, SC.html, RS.html)
-- **Dashboard aprimorado** — Cards de resumo por regional no topo, métricas em tempo real e gráficos interativos
-- **4 Cards de Resumo** — PR, SC, RS e Geral com barras de progresso de alarmes e CFTV
+### 📊 Dashboard Analítico
+- **4 KPI Cards** — Disponibilidade geral (%), Sites online, Sites críticos, Câmeras OK, com indicadores de tendência
+- **4 Cards de Resumo Regional** — PR, SC, RS e Geral com barras de progresso de alarmes e CFTV
 - **4 Gráficos interativos (Chart.js)**:
   - Status de alarmes por regional (barras empilhadas)
   - Status de câmeras por regional (barras agrupadas)
   - Top 10 sites com mais problemas (barras horizontais)
   - Distribuição de tipos de problemas (rosca/doughnut)
-- **Tabela de Problemas Ativos** — Paginação (10/página), ordenação por coluna, filtros por regional e tipo de problema, busca por SIGLA
-- **Exportar Excel (multi-abas)** — Gera arquivo XLSX com abas: Regional PR, Regional SC, Regional RS, Consolidado e Resumo
-- **Exportar PDF** — Relatório imprimível com estatísticas e tabela de problemas
-- **Copiar Resumo** — Copia um resumo executivo para a área de transferência
-- **Métricas de Alarmes & CFTV** — Alarmes conectados/desconectados, CFTV OK/desconectado, Vegetação Alta direto no painel
-- **Resumo por Regional (sidebar)** — Cards com estatísticas individuais de PR, SC e RS
-- **Gráfico comparativo regional** — Barras mostrando alarmes e CFTV por regional
-- **Filtros por regional** — Botões PR / SC / RS para exibir apenas sites de uma regional
-- **Tema claro/escuro** — Toggle ☀️/🌙 com persistência em LocalStorage
-- **Modo Ronda rápida** — Interface focada: um site por vez com botões grandes e atalhos de teclado
+- **Tabela de Problemas Ativos** — Paginação, ordenação por coluna, filtros por regional e tipo, busca por SIGLA
+- **Timeline de Atividades** — Feed de últimas ações com tempo relativo ("há 2 horas")
+
+### 🔍 Busca Global (Omnisearch)
+- Campo de busca no header com atalho **Ctrl+K**
+- Busca em tempo real em sites, regionais e ações do sistema
+- Navegação por teclado (↑↓ + Enter) nos resultados
+- Resultados agrupados por categoria (Sites, Regionais, Ações)
+
+### 📄 Relatórios
+- **Tela dedicada de Relatórios** (atalho `R`)
+- **Disponibilidade** — Métricas por regional com gráfico de barras diárias
+- **SLA** — Meta configurável, status por regional (✅/⚠️/❌)
+- **Rondas** — Ranking de operadores, histórico de rondas recentes
+- **Auditoria** — Log completo de alterações
+- **Exportação** — Excel multi-abas e CSV
+
+### 📥 Importador com Drag-and-Drop
+- **Modal completo** com zona de arrastar-e-soltar
+- **Preview** dos dados antes de importar (20 primeiros sites)
+- **Estratégias** de importação: Mesclar, Apenas Novos, Sobrescrever
+- **Barra de progresso** durante importação
+- **Relatório pós-importação**: X novos, Y atualizados, Z ignorados
+
+### 📋 Audit Log & Backup
+- **Registro automático** de todas as ações: login, logout, marcações, importações
+- **Exportar CSV** do histórico de auditoria
+- **Backup completo** — Exporta JSON com banco de dados + configurações + audit log
+- **Restaurar backup** — Importa e valida arquivo JSON antes de restaurar
+
+### ⌨️ Atalhos de Teclado
+| Atalho | Ação |
+|--------|------|
+| `Ctrl+K` | Abrir busca global |
+| `N` | Iniciar nova ronda |
+| `D` | Ir para Dashboard |
+| `R` | Abrir Relatórios |
+| `S` | Abrir Configurações |
+| `Esc` | Fechar modal / voltar |
+| `?` | Mostrar todos os atalhos |
+
+### ⚙️ Configurações
+- **Meta de SLA** configurável (padrão: 99.5%)
+- **Modo escuro/claro** com persistência
+- **Backup e Restore** direto das configurações
+- **Webhooks** (stub, em breve)
+
+### Funcionalidades Existentes Mantidas
+- **Login de operador** — Identifica quem fez cada ronda
+- **Dados demo automáticos** — 235 sites (PR: 86, SC: 83, RS: 66) ao primeiro login
+- **Importação de XLSX** — Detecta regional automaticamente pelo nome do arquivo/aba
+- **Modo Ronda rápida** — Interface focada: um site por vez com atalhos de teclado
   - `Espaço` / `Enter` = OK · `P` = Parcial · `O` = Offline · `S` = Pular
-  - Modal para registrar câmeras parciais e observação
-- **Marcação rápida** — Botões ✅ ⚠️ ❌ diretamente nos cards e na tabela de problemas
-- **Busca e filtros** — Por sigla, conta ou status (OK / Parcial / Offline / Não Verificado / Com O.S. / Vegetação)
-- **Detalhes do site** — Histórico das últimas 10 rondas, observações e regional
-- **Sincronização multi-usuário** — Exportar/importar JSON para compartilhar rondas
-- **Backup automático** — LocalStorage a cada 5 minutos + backup de DB SQLite
-- **Acessibilidade** — ARIA labels, navegação por teclado, contraste WCAG AA
-- **Responsivo** — Layout adaptado para mobile (320px), tablet (768px) e desktop
+- **Marcação rápida** — Botões ✅ ⚠️ ❌ diretamente nos cards
+- **Exportar Excel (multi-abas)** — PR, SC, RS, Consolidado e Resumo
+- **Exportar PDF** — Relatório imprimível
+- **Sincronização multi-usuário** — Exportar/importar JSON
+- **Tema claro/escuro** — Toggle ☀️/🌙 persistente
 
 ## 🚀 Como Usar
 
@@ -41,12 +77,13 @@ Aplicação web para checklist de sites de câmeras CFTV da Claro, focada em agi
 2. Digite seu nome e clique **Entrar**
    - 235 sites demo serão carregados automaticamente (PR: 86, SC: 83, RS: 66)
 3. Para importar dados reais:
+   - Clique **📥 Importar HTML** para planilhas HTML das regionais (drag-and-drop)
    - Clique **📥 Importar XLSX** para planilhas Excel/CSV
-   - Clique **📥 Importar HTML** para planilhas HTML das regionais
-4. Explore o dashboard: cards de resumo, gráficos e tabela de problemas ativos
+4. Explore o dashboard: KPIs, cards de resumo, gráficos e tabela de problemas ativos
 5. Use os botões de exportação: **📊 Exportar Excel**, **📄 Exportar PDF** ou **📋 Copiar Resumo**
-6. Clique **🚀 Iniciar Ronda** para começar a verificação
-7. Ao finalizar, clique **📤 Exportar Sync** e compartilhe com a equipe
+6. Clique **🚀 Iniciar Ronda** ou pressione `N` para começar a verificação
+7. Acesse **Relatórios** (`R`) para análises detalhadas e exportações
+8. Acesse **Configurações** (`S`) para ajustar SLA, temas e backups
 
 ## 🔄 Sincronização entre Operadores
 
@@ -56,6 +93,17 @@ Aplicação web para checklist de sites de câmeras CFTV da Claro, focada em agi
 4. As rondas são mescladas automaticamente (ronda mais recente prevalece)
 
 ## 📥 Como Importar Dados das Regionais
+
+### Formato HTML (com drag-and-drop)
+
+1. Clique **📥 Importar HTML** na barra de ferramentas
+2. Arraste os arquivos `SC.html`, `RS.html` para a zona de drop, ou clique para selecionar
+3. Revise o preview dos dados (20 primeiros sites)
+4. Escolha a estratégia: **Mesclar** (recomendado), **Apenas Novos** ou **Sobrescrever**
+5. Clique **Importar** e aguarde a barra de progresso
+6. Veja o relatório: X novos, Y atualizados, Z ignorados
+
+A regional é detectada automaticamente pelo nome do arquivo (ex: `SC.html` → SC, `RS.html` → RS).
 
 ### Formato XLSX
 
@@ -77,43 +125,31 @@ A planilha deve conter pelo menos uma coluna de **SIGLA**. As demais colunas rec
 | REGIONAL / ESTADO / UF | PR / SC / RS (auto-detectado se não presente) |
 | OBSERVAÇÃO / OBS | Observações sobre o site |
 
-> **Dica de detecção de regional:** Se a aba da planilha ou o nome do arquivo contiver "PR", "Paraná", "SC", "Santa Catarina", "RS" ou "Rio Grande", a regional é atribuída automaticamente a todos os sites daquela aba.
-
-### Formato HTML
-
-Selecione os arquivos `PR.html`, `SC.html`, `RS.html` usando o botão **📥 Importar HTML**. O sistema detecta a regional automaticamente pelo nome do arquivo ou título da página.
-
-#### Estrutura esperada das planilhas HTML exportadas
+### Estrutura esperada das planilhas HTML exportadas
 
 Os arquivos HTML podem ter:
 
-1. **Cabeçalhos nomeados** (primeira forma) – A tabela tem uma linha de cabeçalho com nomes de coluna reconhecíveis:
+1. **Cabeçalhos nomeados** — Linha de cabeçalho com nomes reconhecíveis (CONTA, SIGLA, STATUS, etc.)
 
-| Col | Cabeçalho | Campo |
-|-----|-----------|-------|
-| B | CONTA | ID numérico do site |
-| C | SIGLA | Código do site (ex: PRFOZ01) |
-| D | STATUS | ONLINE / DESCONECTADO / NÃO POSSUI |
-| E | DATA | Data de desconexão (DD/MM/AA ou DD/MM/AAAA) |
-| F | O.S. / N TICKET | Número da ordem de serviço |
-| G | ZONA | Zona afetada |
-| H | STATUS 4 | Status monitoramento |
-| I | PADRÃO DE CÂMERAS | Quantidade padrão de câmeras |
-| J | ONTEM | Câmeras funcionando ontem |
-| K | HOJE | Câmeras funcionando hoje |
-| L | STATUS 2 / STATUS CFTV | OK / PARCIAL / DESCONECTADO |
-| M | DATA DA ALTERAÇÃO | Data de alteração do CFTV (DD/MM/AA ou DD/MM/AAAA) |
-| N | VEGETAÇÃO ALTA | VERDADEIRO / FALSO (ou TRUE / FALSE) |
-| O–AC | (câmeras individuais) | ⬛ escura, 🔶 obstruída, 📶 sem sinal, ❌ offline |
-| AD | O QUE HOUVE? / OBSERVAÇÃO | Observações operacionais |
+2. **Formato posicional fixo** — Sem cabeçalhos; o sistema detecta SIGLA na coluna 3 e aplica mapeamento fixo:
 
-2. **Formato posicional fixo** (segunda forma) – Para planilhas sem cabeçalhos reconhecíveis, o sistema detecta a SIGLA automaticamente pela posição (coluna 3) e aplica o mapeamento fixo acima.
-
-> **Dicas:**
-> - A regional é auto-detectada pelo nome do arquivo (ex: `PR.html` → PR, `SC.html` → SC)
-> - Valores booleanos em português (`VERDADEIRO`/`FALSO`) são reconhecidos automaticamente
-> - Datas no formato brasileiro DD/MM/AA e DD/MM/AAAA são convertidas automaticamente
-> - Múltiplos arquivos podem ser importados de uma vez (segure Ctrl ao selecionar)
+| Col | Campo |
+|-----|-------|
+| B | CONTA |
+| C | SIGLA |
+| D | STATUS alarme |
+| E | DATA desconexão |
+| F | O.S. |
+| G | ZONA |
+| H | STATUS4 |
+| I | PADRÃO CÂMERAS |
+| J | ONTEM |
+| K | HOJE |
+| L | STATUS CFTV |
+| M | DATA ALTERAÇÃO |
+| N | VEGETAÇÃO ALTA |
+| O–AC | Câmeras individuais (⬛ escura, 🔶 obstruída, 📶 sem sinal, ❌ offline) |
+| AD | OBSERVAÇÃO |
 
 #### Usando `parseRegionalHTML` programaticamente
 
@@ -126,7 +162,7 @@ sites.forEach(s => {
   console.log(s.sigla, s.status_conexao, s.status2, s.observacao);
 });
 
-// O parâmetro de regional é opcional (auto-detectado se omitido)
+// A regional é opcional (auto-detectada se omitida)
 const sitesAutoDetect = parseRegionalHTML(htmlString);
 
 // Para importar direto no banco:
@@ -139,6 +175,7 @@ console.log(`${result.imported} novos, ${result.updated} atualizados`);
 - **[sql.js](https://github.com/sql-js/sql.js)** v1.10.3 — SQLite no navegador
 - **[SheetJS](https://sheetjs.com/)** v0.18.5 — Leitura e escrita de XLSX
 - **[Chart.js](https://www.chartjs.org/)** v4.4.0 — Gráficos interativos
+- **[Inter](https://fonts.google.com/specimen/Inter)** — Tipografia (Google Fonts)
 - HTML + CSS + JavaScript puro (sem framework, sem servidor)
 
 ## 📁 Estrutura de Arquivos
@@ -147,16 +184,21 @@ console.log(`${result.imported} novos, ${result.updated} atualizados`);
 /
 ├── index.html          # Interface principal
 ├── css/
-│   ├── styles.css      # Design (dark/light theme)
-│   └── dashboard.css   # Estilos do dashboard aprimorado
+│   ├── styles.css      # Design base (dark/light theme)
+│   ├── dashboard.css   # Estilos do dashboard
+│   └── features.css    # KPIs, Timeline, Omnisearch, Modais, Relatórios
 ├── js/
-│   ├── app.js          # Controlador principal
+│   ├── app.js          # Controlador principal + Settings + Keyboard shortcuts
 │   ├── database.js     # Wrapper SQLite (sql.js)
 │   ├── xlsx-import.js  # Importação de planilhas XLSX
-│   ├── dataImporter.js # Importação de HTML + dados demo
-│   ├── dashboard.js    # Cards, gráficos e tabela de problemas
+│   ├── dataImporter.js # Importação HTML com modal drag-and-drop + dados demo
+│   ├── dashboard.js    # Cards regionais, gráficos e tabela de problemas
 │   ├── exporter.js     # Exportação Excel/PDF/Clipboard
 │   ├── ronda.js        # Modo ronda
-│   └── sync.js         # Exportar/importar JSON
+│   ├── sync.js         # Exportar/importar JSON multi-usuário
+│   ├── kpi.js          # KPI cards + Timeline de atividades
+│   ├── auditlog.js     # Audit log + Backup/Restore
+│   ├── omnisearch.js   # Busca global (Ctrl+K)
+│   └── reports.js      # Tela de Relatórios (Disponibilidade/SLA/Rondas/Auditoria)
 └── README.md
 ```
