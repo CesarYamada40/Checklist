@@ -100,11 +100,13 @@ function doLogin() {
   appState.operador = name;
   localStorage.setItem('cftv_operador', name);
   upsertUsuario(name);
+  if (typeof auditLog === 'function') auditLog('login', `Login: ${name}`);
   showMainScreen();
 }
 
 function doLogout() {
   if (!confirm('Deseja sair? Você precisará fazer login novamente.')) return;
+  if (typeof auditLog === 'function') auditLog('logout', `Logout: ${appState.operador || ''}`);
   appState.operador = null;
   localStorage.removeItem('cftv_operador');
   if (rondaState.active) {
@@ -121,6 +123,11 @@ function showMainScreen() {
   const themeBtn = document.getElementById('theme-toggle');
   if (themeBtn) themeBtn.textContent = appState.darkMode ? '☀️' : '🌙';
   showScreen('main');
+
+  // Update active nav tab
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const navDash = document.getElementById('nav-dashboard');
+  if (navDash) navDash.classList.add('active');
 
   // Seed demo data on first use (dataImporter.js)
   if (typeof seedDemoDataIfEmpty === 'function') {
@@ -166,6 +173,10 @@ function refreshDashboard() {
   // Enhanced dashboard components (dashboard.js)
   if (typeof refreshEnhancedDashboard === 'function') {
     refreshEnhancedDashboard();
+  }
+  // KPI section and timeline (kpi.js)
+  if (typeof refreshKPISection === 'function') {
+    refreshKPISection();
   }
 }
 
@@ -424,6 +435,9 @@ function quickMark(siteId, status) {
     cameras_esperadas: site.padrao_cameras,
     observacao: null,
   });
+  if (typeof auditLog === 'function') {
+    auditLog('status_alterado', `${site.sigla} marcado como ${status}`, { target: site.sigla });
+  }
   showToast(`${statusToIcon(status)} ${site.sigla} marcado como ${status}`, 'success');
   renderSitesList();
   refreshDashboard();
@@ -842,6 +856,268 @@ function showToast(message, type = 'info', duration = 3000) {
   }, duration);
 }
 
+// ─── Settings Screen ─────────────────────────────────────────────────────────
+
+function showSettingsScreen() {
+  showScreen('settings');
+  renderSettingsScreen();
+  // Update active nav tab
+  document.querySelectorAll('.nav-tab').forEach(t => t.classList.remove('active'));
+  const navSettings = document.getElementById('nav-settings');
+  if (navSettings) navSettings.classList.add('active');
+  if (typeof auditLog === 'function') auditLog('settings_aberto', 'Tela de configurações acessada');
+}
+
+function closeSettingsScreen() {
+  showScreen('main');
+}
+
+function renderSettingsScreen() {
+  const screen = document.getElementById('screen-settings');
+  if (!screen) return;
+
+  const slaTarget = localStorage.getItem('cftv_sla_target') || '99.5';
+
+  screen.innerHTML = `
+    <div class="settings-header">
+      <button class="btn btn-outline" onclick="closeSettingsScreen()" style="padding:6px 12px;font-size:.82rem">
+        ← Voltar
+      </button>
+      <div class="settings-header-title">⚙️ Configurações</div>
+    </div>
+    <div class="settings-body">
+
+      <div class="settings-section">
+        <div class="settings-section-title">🎯 SLA e Metas</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Meta de Disponibilidade (SLA)</div>
+              <div class="settings-row-desc">Percentual mínimo aceitável de uptime</div>
+            </div>
+            <div class="settings-row-control">
+              <input type="number" value="${slaTarget}" min="90" max="100" step="0.1"
+                id="setting-sla-target" style="width:90px"
+                onchange="localStorage.setItem('cftv_sla_target',this.value);showToast('✅ Configuração salva','success',2000)">
+              <span style="font-size:.82rem;color:var(--text-muted);margin-left:4px">%</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">💾 Dados e Backup</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Exportar Backup Completo</div>
+              <div class="settings-row-desc">Baixar arquivo JSON com todos os dados</div>
+            </div>
+            <div class="settings-row-control">
+              <button class="btn btn-outline" style="font-size:.8rem" onclick="exportarBackupCompleto()">
+                💾 Exportar
+              </button>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Restaurar Backup</div>
+              <div class="settings-row-desc">Importar arquivo JSON de backup anterior</div>
+            </div>
+            <div class="settings-row-control">
+              <button class="btn btn-outline" style="font-size:.8rem"
+                onclick="document.getElementById('backup-file-input').click()">
+                📂 Importar
+              </button>
+              <input type="file" id="backup-file-input" accept=".json" style="display:none"
+                onchange="if(this.files[0])importarBackup(this.files[0])">
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Limpar Log de Auditoria</div>
+              <div class="settings-row-desc">Remove todas as entradas do histórico de ações</div>
+            </div>
+            <div class="settings-row-control">
+              <button class="btn btn-outline" style="font-size:.8rem;color:var(--offline)"
+                onclick="if(confirm('Limpar log de auditoria?')){auditLogClear();showToast('✅ Log limpo','success',2000)}">
+                🗑️ Limpar
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🖥️ Aparência</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Modo Escuro</div>
+              <div class="settings-row-desc">Alternar entre tema claro e escuro</div>
+            </div>
+            <div class="settings-row-control">
+              <label class="toggle-switch">
+                <input type="checkbox" ${appState.darkMode ? 'checked' : ''}
+                  onchange="toggleTheme()">
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">🔔 Notificações <span class="badge-soon">Em breve</span></div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Notificações Push</div>
+              <div class="settings-row-desc">Alertas para sites críticos (requer backend)</div>
+            </div>
+            <div class="settings-row-control">
+              <label class="toggle-switch">
+                <input type="checkbox" disabled>
+                <div class="toggle-slider"></div>
+              </label>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Webhooks</div>
+              <div class="settings-row-desc">Integração com sistemas externos</div>
+            </div>
+            <div class="settings-row-control">
+              <input type="text" placeholder="https://..." disabled style="width:180px;opacity:.5">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="settings-section">
+        <div class="settings-section-title">ℹ️ Sobre o Sistema</div>
+        <div class="settings-card">
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Checklist CFTV - Claro Regional Sul</div>
+              <div class="settings-row-desc">Versão 2.0 · 100% client-side · SQLite no navegador</div>
+            </div>
+          </div>
+          <div class="settings-row">
+            <div>
+              <div class="settings-row-label">Atalhos de Teclado</div>
+              <div class="settings-row-desc">Ctrl+K: Busca · N: Ronda · D: Dashboard · R: Relatórios · ?: Ajuda</div>
+            </div>
+            <div class="settings-row-control">
+              <button class="btn btn-outline" style="font-size:.8rem" onclick="showShortcutsModal()">⌨️ Ver Atalhos</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  `;
+}
+
+// ─── Shortcuts Modal ──────────────────────────────────────────────────────────
+
+function showShortcutsModal() {
+  const existing = document.getElementById('shortcuts-modal-overlay');
+  if (existing) { existing.remove(); return; }
+
+  const overlay = document.createElement('div');
+  overlay.id = 'shortcuts-modal-overlay';
+  overlay.className = 'shortcuts-modal-overlay';
+  overlay.innerHTML = `
+    <div class="shortcuts-modal">
+      <div class="shortcuts-modal-title">⌨️ Atalhos de Teclado</div>
+      ${[
+        { keys: ['Ctrl', 'K'],  desc: 'Busca global (Omnisearch)' },
+        { keys: ['N'],          desc: 'Iniciar nova ronda' },
+        { keys: ['D'],          desc: 'Ir para o Dashboard' },
+        { keys: ['R'],          desc: 'Abrir Relatórios' },
+        { keys: ['S'],          desc: 'Abrir Configurações' },
+        { keys: ['Esc'],        desc: 'Fechar modal / voltar' },
+        { keys: ['?'],          desc: 'Mostrar atalhos' },
+      ].map(s => `
+        <div class="shortcut-row">
+          <span class="shortcut-desc">${s.desc}</span>
+          <span class="shortcut-key">
+            ${s.keys.map(k => `<span class="kbd">${k}</span>`).join(' + ')}
+          </span>
+        </div>
+      `).join('')}
+      <div style="margin-top:16px;text-align:right">
+        <button class="btn btn-outline" onclick="document.getElementById('shortcuts-modal-overlay').remove()">
+          Fechar
+        </button>
+      </div>
+    </div>
+  `;
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+  document.body.appendChild(overlay);
+}
+
+// ─── Keyboard Shortcuts ───────────────────────────────────────────────────────
+
+function _initKeyboardShortcuts() {
+  document.addEventListener('keydown', e => {
+    // Skip shortcuts when typing in an input
+    const tag = document.activeElement?.tagName?.toLowerCase();
+    const isTyping = tag === 'input' || tag === 'textarea' || tag === 'select';
+
+    // Ctrl+K → Omnisearch (always active)
+    if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+      e.preventDefault();
+      if (typeof openOmnisearch === 'function') openOmnisearch();
+      return;
+    }
+
+    if (isTyping) return;
+
+    switch (e.key) {
+      case '?':
+        showShortcutsModal();
+        break;
+      case 'n':
+      case 'N':
+        if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); triggerStartRonda(); }
+        break;
+      case 'd':
+      case 'D':
+        if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); showMainScreen(); }
+        break;
+      case 'r':
+      case 'R':
+        if (!e.ctrlKey && !e.metaKey && typeof showReportsScreen === 'function') {
+          e.preventDefault();
+          showReportsScreen();
+        }
+        break;
+      case 's':
+      case 'S':
+        if (!e.ctrlKey && !e.metaKey) { e.preventDefault(); showSettingsScreen(); }
+        break;
+      case 'Escape':
+        // Close any open modal or return to main screen
+        if (document.getElementById('shortcuts-modal-overlay')) {
+          document.getElementById('shortcuts-modal-overlay').remove();
+        } else if (document.getElementById('importer-modal-overlay')) {
+          if (typeof _closeImporterModal === 'function') _closeImporterModal();
+        } else {
+          const curScreen = document.querySelector('.screen:not(.hidden)');
+          if (curScreen &&
+              curScreen.id !== 'screen-main' &&
+              curScreen.id !== 'screen-loading' &&
+              curScreen.id !== 'screen-login') {
+            showScreen('main');
+          }
+        }
+        break;
+    }
+  });
+}
+
 // Login form enter key
 document.addEventListener('DOMContentLoaded', () => {
   document.getElementById('login-name')?.addEventListener('keydown', e => {
@@ -849,4 +1125,10 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   document.getElementById('search-input')?.addEventListener('input', onSearch);
+
+  // Initialize omnisearch after DOM is ready
+  if (typeof initOmnisearch === 'function') initOmnisearch();
+
+  // Initialize keyboard shortcuts
+  _initKeyboardShortcuts();
 });

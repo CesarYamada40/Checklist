@@ -37,7 +37,7 @@ body.light-mode {
 
 html, body {
   height: 100%;
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
   background: var(--bg);
   color: var(--text);
   font-size: 15px;
@@ -122,23 +122,24 @@ html, body {
 .app-header {
   background: var(--surface);
   border-bottom: 1px solid var(--border);
-  padding: 12px 20px;
+  padding: 10px 20px;
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 12px;
   position: sticky;
   top: 0;
   z-index: 100;
   backdrop-filter: blur(8px);
 }
-.app-logo { font-size: 1.4rem; font-weight: 700; color: var(--accent); white-space: nowrap; }
-.header-spacer { flex: 1; }
+.app-logo { font-size: 1.2rem; font-weight: 800; color: var(--accent); white-space: nowrap; }
+.header-spacer { flex: 1; min-width: 8px; }
 .operator-badge {
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   color: var(--text-muted);
-  font-size: .85rem;
+  font-size: .82rem;
+  white-space: nowrap;
 }
 .operator-badge strong { color: var(--text); }
 .btn-logout {
