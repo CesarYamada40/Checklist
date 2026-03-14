@@ -506,350 +506,418 @@ function importHTMLFile(file, regional) {
 }
 
 /**
- * Open the drag-and-drop HTML import modal.
- * Shows a preview of the data before importing.
+ * Open file picker and import one or more HTML regional files.
+ * Refreshes dashboard and site list on completion.
+ * @deprecated Use openHTMLImportModal() for the full preview workflow.
  */
 function triggerHTMLImport() {
-  _showImporterModal();
+  openHTMLImportModal();
 }
 
-// ─── Importer Modal ───────────────────────────────────────────────────────────
+// ─── HTML Import Modal (Preview Workflow) ────────────────────────────────────
 
-const _importerState = {
-  files:        [],
-  previewed:    [],
-  strategy:     'mesclar', // 'mesclar' | 'sobrescrever' | 'apenas_novos'
-  loading:      false,
-  result:       null,
+/** Internal state for the import preview modal */
+const _importState = {
+  sites: [],      // annotated parsed site objects ({ ...site, _existing, _include })
+  fileNames: [],  // source file names for display
+  escHandler: null,
 };
 
 /**
- * Renders and shows the drag-and-drop HTML importer modal.
+ * Open the HTML import modal.
+ * Provides file upload + paste HTML tabs, a preview table with new/update badges,
+ * merge-or-skip control for duplicates, and a confirm step before writing to DB.
  */
-function _showImporterModal() {
-  _importerState.files     = [];
-  _importerState.previewed = [];
-  _importerState.result    = null;
+function openHTMLImportModal() {
+  closeHTMLImportModal(); // remove any leftover modal
 
-  // Remove any existing modal
-  const existing = document.getElementById('importer-modal-overlay');
-  if (existing) existing.remove();
+  const modal = document.createElement('div');
+  modal.id = 'html-import-modal';
+  modal.className = 'html-import-overlay';
+  modal.setAttribute('role', 'dialog');
+  modal.setAttribute('aria-modal', 'true');
+  modal.setAttribute('aria-label', 'Importar Planilha HTML Regional');
 
-  const overlay = document.createElement('div');
-  overlay.id        = 'importer-modal-overlay';
-  overlay.className = 'importer-modal-overlay';
-  overlay.setAttribute('role', 'dialog');
-  overlay.setAttribute('aria-modal', 'true');
-  overlay.setAttribute('aria-labelledby', 'importer-modal-title');
+  modal.innerHTML = `
+    <div class="html-import-dialog" role="document">
 
-  overlay.innerHTML = `
-    <div class="importer-modal" id="importer-modal">
-      <div class="importer-modal-header">
-        <span class="importer-modal-title" id="importer-modal-title">📥 Importar Planilhas Regionais</span>
-        <button class="importer-modal-close" onclick="_closeImporterModal()" aria-label="Fechar">✕</button>
+      <!-- Header -->
+      <div class="html-import-header">
+        <div class="html-import-header-text">
+          <h2 class="html-import-title">📥 Importar Planilha HTML Regional</h2>
+          <p class="html-import-subtitle">Suporta exportações do Google Sheets: PR.html, SC.html, RS.html</p>
+        </div>
+        <button class="html-import-close" onclick="closeHTMLImportModal()" aria-label="Fechar">✕</button>
       </div>
-      <div class="importer-modal-body">
-        <!-- Drop Zone -->
-        <div class="drop-zone" id="importer-drop-zone"
-          onclick="document.getElementById('importer-file-input').click()"
-          ondragover="_importerDragOver(event)"
-          ondragleave="_importerDragLeave(event)"
-          ondrop="_importerDrop(event)"
-          tabindex="0"
-          role="button"
-          aria-label="Zona de arrastar e soltar arquivos HTML"
-          onkeydown="if(e.key==='Enter'||e.key===' ')document.getElementById('importer-file-input').click()">
-          <div class="drop-zone-icon">📂</div>
-          <div class="drop-zone-label">Arraste os arquivos SC.html e RS.html aqui</div>
-          <div class="drop-zone-sub">ou clique para selecionar · Aceita .html e .htm</div>
+
+      <!-- Tabs -->
+      <div class="html-import-tabs" role="tablist">
+        <button class="html-import-tab html-import-tab-active"
+                role="tab" aria-selected="true"
+                data-tab="file" onclick="switchHTMLImportTab('file')">📁 Arquivo HTML</button>
+        <button class="html-import-tab"
+                role="tab" aria-selected="false"
+                data-tab="paste" onclick="switchHTMLImportTab('paste')">📋 Colar HTML</button>
+      </div>
+
+      <!-- Tab: File upload -->
+      <div id="html-import-tab-file" class="html-import-tab-content" role="tabpanel">
+        <div class="html-import-dropzone"
+             id="html-import-dropzone"
+             tabindex="0"
+             role="button"
+             aria-label="Arraste arquivos HTML aqui ou pressione Enter para abrir o seletor de arquivos"
+             onclick="document.getElementById('html-import-file-input').click()"
+             onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();document.getElementById('html-import-file-input').click();}"
+             ondrop="handleHTMLImportDrop(event)"
+             ondragover="event.preventDefault();this.classList.add('drag-over')"
+             ondragleave="this.classList.remove('drag-over')">
+          <div class="dropzone-icon" aria-hidden="true">📂</div>
+          <p class="dropzone-title">Arraste os arquivos HTML aqui</p>
+          <p class="dropzone-sub">ou clique para selecionar</p>
+          <input type="file" id="html-import-file-input"
+                 accept=".html,.htm" multiple
+                 style="display:none"
+                 onchange="handleHTMLImportFileInput(event)">
         </div>
-        <input type="file" id="importer-file-input" accept=".html,.htm" multiple style="display:none"
-          onchange="_importerFilesSelected(event)">
+        <p class="html-import-hint">
+          💡 Selecione um ou mais arquivos: <code>PR.html</code>, <code>SC.html</code>, <code>RS.html</code>.
+          A regional é detectada automaticamente pelo nome do arquivo.
+        </p>
+      </div>
 
-        <!-- File pills -->
-        <div class="file-pills" id="importer-file-pills"></div>
-
-        <!-- Import strategy options -->
-        <div class="import-options">
-          <label class="import-option">
-            <input type="radio" name="import-strategy" value="mesclar" checked
-              onchange="_importerState.strategy='mesclar'">
-            <div>
-              <div class="import-option-label">🔄 Mesclar (Recomendado)</div>
-              <div class="import-option-desc">Atualiza sites existentes e cria os novos</div>
-            </div>
-          </label>
-          <label class="import-option">
-            <input type="radio" name="import-strategy" value="apenas_novos"
-              onchange="_importerState.strategy='apenas_novos'">
-            <div>
-              <div class="import-option-label">➕ Apenas Novos</div>
-              <div class="import-option-desc">Cria apenas sites que ainda não existem</div>
-            </div>
-          </label>
-          <label class="import-option">
-            <input type="radio" name="import-strategy" value="sobrescrever"
-              onchange="_importerState.strategy='sobrescrever'">
-            <div>
-              <div class="import-option-label">⚠️ Sobrescrever</div>
-              <div class="import-option-desc">Substitui todos os dados dos sites importados</div>
-            </div>
-          </label>
+      <!-- Tab: Paste HTML -->
+      <div id="html-import-tab-paste" class="html-import-tab-content hidden" role="tabpanel">
+        <div class="html-import-paste-controls">
+          <label class="html-import-label" for="html-import-regional-select">Regional:</label>
+          <select id="html-import-regional-select" class="html-import-select">
+            <option value="">Auto-detectar pelo conteúdo</option>
+            <option value="PR">📍 PR – Paraná</option>
+            <option value="SC">📍 SC – Santa Catarina</option>
+            <option value="RS">📍 RS – Rio Grande do Sul</option>
+          </select>
+          <button class="btn btn-outline btn-sm" onclick="loadHTMLImportSample()">📄 Exemplo</button>
         </div>
+        <textarea id="html-import-paste-input"
+                  class="html-import-paste-area"
+                  rows="8"
+                  spellcheck="false"
+                  aria-label="Cole o HTML da planilha aqui"
+                  placeholder="Cole aqui o conteúdo HTML da planilha (use Arquivo > Salvar Como > Página da Web no Google Sheets, ou Ctrl+A e Ctrl+C na página HTML aberta)..."></textarea>
+        <button class="btn btn-primary" onclick="parseHTMLImportPaste()" style="margin-top:8px">
+          🔍 Analisar HTML
+        </button>
+      </div>
 
-        <!-- Preview -->
-        <div class="import-preview" id="importer-preview" style="display:none">
-          <div class="import-preview-title">👁 Preview dos dados</div>
-          <div class="import-preview-table-wrap">
-            <table class="import-preview-table" id="importer-preview-table">
-              <thead>
-                <tr>
-                  <th>Sigla</th>
-                  <th>Conta</th>
-                  <th>Regional</th>
-                  <th>Status Alarme</th>
-                  <th>Status CFTV</th>
-                  <th>Câmeras</th>
-                </tr>
-              </thead>
-              <tbody id="importer-preview-body"></tbody>
-            </table>
-          </div>
-          <div id="importer-preview-count" style="font-size:.75rem;color:var(--text-muted);margin-top:6px"></div>
-        </div>
-
-        <!-- Progress -->
-        <div class="import-progress" id="importer-progress" style="display:none">
-          <div class="import-progress-text" id="importer-progress-text">Processando...</div>
-          <div class="import-progress-bar">
-            <div class="import-progress-fill" id="importer-progress-fill" style="width:0%"></div>
+      <!-- Preview section (hidden until parsing completes) -->
+      <div id="html-import-preview-section" class="html-import-preview hidden" aria-live="polite">
+        <div class="preview-summary-bar">
+          <div id="html-import-preview-count" class="preview-count" role="status"></div>
+          <div class="preview-dup-row">
+            <label class="html-import-label" for="html-import-dup-mode">Sites duplicados:</label>
+            <select id="html-import-dup-mode" class="html-import-select html-import-select-sm">
+              <option value="merge">Atualizar dados existentes (mesclar)</option>
+              <option value="skip">Ignorar sites já cadastrados</option>
+            </select>
           </div>
         </div>
+        <div class="preview-table-wrap">
+          <table class="preview-table" aria-label="Preview dos sites encontrados">
+            <thead>
+              <tr>
+                <th>Regional</th>
+                <th>Sigla</th>
+                <th>Conta</th>
+                <th>Alarme</th>
+                <th>CFTV</th>
+                <th>Câm.</th>
+                <th>Veg.</th>
+                <th>Observação</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody id="html-import-preview-tbody"></tbody>
+          </table>
+        </div>
+        <div class="preview-footer">
+          <button class="btn btn-secondary" onclick="closeHTMLImportModal()">✕ Cancelar</button>
+          <button class="btn btn-primary" id="html-import-confirm-btn" onclick="confirmHTMLImport()">
+            ✅ Confirmar Importação
+          </button>
+        </div>
+      </div>
 
-        <!-- Result -->
-        <div class="import-result" id="importer-result" style="display:none"></div>
-      </div>
-      <div class="importer-modal-footer">
-        <button class="btn btn-outline" onclick="_closeImporterModal()">Cancelar</button>
-        <button class="btn btn-secondary" id="importer-preview-btn"
-          onclick="_importerDoPreview()" style="display:none">👁 Preview</button>
-        <button class="btn btn-primary" id="importer-import-btn"
-          onclick="_importerDoImport()" style="display:none">✅ Importar</button>
-      </div>
     </div>
   `;
 
-  document.body.appendChild(overlay);
+  document.body.appendChild(modal);
+
+  _importState.sites = [];
+  _importState.fileNames = [];
 
   // Close on overlay click
-  overlay.addEventListener('click', e => {
-    if (e.target === overlay) _closeImporterModal();
+  modal.addEventListener('click', e => {
+    if (e.target === modal) closeHTMLImportModal();
   });
 
-  // Trap focus in modal
-  const modal = overlay.querySelector('.importer-modal');
-  if (modal) modal.querySelector('.importer-modal-close').focus();
+  // Close on ESC
+  _importState.escHandler = e => {
+    if (e.key === 'Escape') closeHTMLImportModal();
+  };
+  document.addEventListener('keydown', _importState.escHandler);
 }
 
-function _closeImporterModal() {
-  const overlay = document.getElementById('importer-modal-overlay');
-  if (overlay) overlay.remove();
-}
-
-function _importerDragOver(e) {
-  e.preventDefault();
-  document.getElementById('importer-drop-zone').classList.add('dragover');
-}
-
-function _importerDragLeave(e) {
-  document.getElementById('importer-drop-zone').classList.remove('dragover');
-}
-
-function _importerDrop(e) {
-  e.preventDefault();
-  document.getElementById('importer-drop-zone').classList.remove('dragover');
-  const files = Array.from(e.dataTransfer.files).filter(f => /\.html?$/i.test(f.name));
-  if (files.length) _importerAddFiles(files);
-}
-
-function _importerFilesSelected(e) {
-  const files = Array.from(e.target.files);
-  if (files.length) _importerAddFiles(files);
-}
-
-function _importerAddFiles(newFiles) {
-  // Merge, avoiding duplicates by name
-  const existing = _importerState.files.map(f => f.name);
-  newFiles.forEach(f => {
-    if (!existing.includes(f.name)) _importerState.files.push(f);
-  });
-  _importerRenderPills();
-  _importerRenderButtons();
-  _importerDoPreview();
-}
-
-function _importerRenderPills() {
-  const container = document.getElementById('importer-file-pills');
-  if (!container) return;
-  container.innerHTML = _importerState.files.map((f, i) => `
-    <div class="file-pill">
-      📄 ${escapeHtml(f.name)}
-      <button class="file-pill-remove" onclick="_importerRemoveFile(${i})" aria-label="Remover ${escapeHtml(f.name)}">✕</button>
-    </div>
-  `).join('');
-}
-
-function _importerRemoveFile(idx) {
-  _importerState.files.splice(idx, 1);
-  _importerRenderPills();
-  _importerRenderButtons();
-  if (!_importerState.files.length) {
-    const preview = document.getElementById('importer-preview');
-    if (preview) preview.style.display = 'none';
-  } else {
-    _importerDoPreview();
+/** Close and clean up the import modal */
+function closeHTMLImportModal() {
+  const el = document.getElementById('html-import-modal');
+  if (el) el.remove();
+  _importState.sites = [];
+  _importState.fileNames = [];
+  if (_importState.escHandler) {
+    document.removeEventListener('keydown', _importState.escHandler);
+    _importState.escHandler = null;
   }
 }
 
-function _importerRenderButtons() {
-  const hasFiles = _importerState.files.length > 0;
-  const previewBtn = document.getElementById('importer-preview-btn');
-  const importBtn  = document.getElementById('importer-import-btn');
-  if (previewBtn) previewBtn.style.display = hasFiles ? '' : 'none';
-  if (importBtn)  importBtn.style.display  = hasFiles ? '' : 'none';
+/** Switch between "file" and "paste" import tabs */
+function switchHTMLImportTab(tab) {
+  document.querySelectorAll('.html-import-tab').forEach(t => {
+    const isActive = t.dataset.tab === tab;
+    t.classList.toggle('html-import-tab-active', isActive);
+    t.setAttribute('aria-selected', String(isActive));
+  });
+  const fileTab  = document.getElementById('html-import-tab-file');
+  const pasteTab = document.getElementById('html-import-tab-paste');
+  if (fileTab)  fileTab.classList.toggle('hidden', tab !== 'file');
+  if (pasteTab) pasteTab.classList.toggle('hidden', tab !== 'paste');
+  // Hide preview when switching tabs
+  document.getElementById('html-import-preview-section')?.classList.add('hidden');
 }
 
-async function _importerDoPreview() {
-  if (!_importerState.files.length) return;
-  const previewSection = document.getElementById('importer-preview');
-  const tbody          = document.getElementById('importer-preview-body');
-  const countEl        = document.getElementById('importer-preview-count');
-  if (!previewSection || !tbody) return;
+/** Handle file input change event */
+async function handleHTMLImportFileInput(event) {
+  const files = Array.from(event.target.files);
+  if (!files.length) return;
+  await _processHTMLImportFiles(files);
+}
 
-  // Parse first file for preview
-  const file = _importerState.files[0];
-  try {
-    const text = await file.text();
-    const reg = typeof detectRegional !== 'undefined' ? detectRegional('', file.name) : null;
-    const sites = parseRegionalHTML(text, reg);
-    _importerState.previewed = sites;
-
-    tbody.innerHTML = sites.slice(0, 20).map(s => `
-      <tr>
-        <td>${escapeHtml(s.sigla || '-')}</td>
-        <td>${escapeHtml(String(s.conta || '-'))}</td>
-        <td>${escapeHtml(s.regional || '-')}</td>
-        <td>${escapeHtml(s.status_conexao || '-')}</td>
-        <td>${escapeHtml(s.status2 || '-')}</td>
-        <td>${s.cameras_hoje !== null && s.cameras_hoje !== undefined ? escapeHtml(String(s.cameras_hoje)) : '-'}/${s.padrao_cameras || '-'}</td>
-      </tr>
-    `).join('');
-
-    if (countEl) {
-      const extra = sites.length > 20 ? ` (mostrando 20 de ${sites.length})` : '';
-      countEl.textContent = `${sites.length} sites encontrados no arquivo${extra}`;
-    }
-    previewSection.style.display = '';
-  } catch (err) {
-    tbody.innerHTML = `<tr><td colspan="6" style="color:var(--offline);padding:8px">Erro ao fazer preview: ${escapeHtml(err.message)}</td></tr>`;
-    previewSection.style.display = '';
+/** Handle drag-and-drop file event */
+async function handleHTMLImportDrop(event) {
+  event.preventDefault();
+  document.getElementById('html-import-dropzone')?.classList.remove('drag-over');
+  const files = Array.from(event.dataTransfer.files).filter(
+    f => /\.(html|htm)$/i.test(f.name)
+  );
+  if (!files.length) {
+    showToast('❌ Nenhum arquivo HTML detectado no drop', 'error');
+    return;
   }
+  await _processHTMLImportFiles(files);
 }
 
-async function _importerDoImport() {
-  if (!_importerState.files.length) return;
-  _importerState.loading = true;
+/** Parse multiple HTML files and populate the preview */
+async function _processHTMLImportFiles(files) {
+  _importState.fileNames = files.map(f => f.name);
+  const allSites = [];
 
-  const progressSection = document.getElementById('importer-progress');
-  const progressFill    = document.getElementById('importer-progress-fill');
-  const progressText    = document.getElementById('importer-progress-text');
-  const importBtn       = document.getElementById('importer-import-btn');
-  const resultEl        = document.getElementById('importer-result');
+  showToast('⏳ Analisando arquivos HTML...', 'info', 2000);
 
-  if (progressSection) progressSection.style.display = '';
-  if (importBtn) importBtn.disabled = true;
-
-  let totalImported = 0, totalUpdated = 0, totalSkipped = 0;
-  const allErrors   = [];
-  const total       = _importerState.files.length;
-
-  for (let i = 0; i < total; i++) {
-    const file = _importerState.files[i];
-    const pct  = Math.round(((i + 1) / total) * 100);
-    if (progressFill) progressFill.style.width = `${pct}%`;
-    if (progressText) progressText.textContent = `Importando ${file.name} (${i + 1}/${total})...`;
-
+  for (const file of files) {
     try {
-      const text = await file.text();
-      const reg  = typeof detectRegional !== 'undefined' ? detectRegional('', file.name) : null;
-      const r    = importFromHTML(text, reg);
-
-      totalImported += r.imported;
-      totalUpdated  += r.updated;
-      totalSkipped  += r.skipped;
-      if (r.errors && r.errors.length) allErrors.push(...r.errors.map(e => `${file.name}: ${e}`));
-    } catch (err) {
-      allErrors.push(`${file.name}: ${err.message}`);
+      const html = await _readFileAsText(file);
+      // detectRegional(sheetName, fileName): pass empty string for sheetName since
+      // we are detecting from the file name only (e.g. "PR.html" → 'PR')
+      const reg = (typeof detectRegional === 'function')
+        ? detectRegional('', file.name) : null;
+      const sites = parseRegionalHTML(html, reg || undefined);
+      allSites.push(...sites);
+    } catch (e) {
+      showToast(`❌ Erro em ${file.name}: ${e.message}`, 'error', 4000);
     }
   }
 
-  // Registro de auditoria
-  if (typeof auditLog === 'function') {
-    auditLog('import', `Importação HTML: ${totalImported} novos, ${totalUpdated} atualizados, ${totalSkipped} ignorados`);
+  _importState.sites = allSites;
+  _showHTMLImportPreview();
+}
+
+/** Parse pasted HTML content and show the preview */
+function parseHTMLImportPaste() {
+  const html = (document.getElementById('html-import-paste-input')?.value || '').trim();
+  if (!html) {
+    showToast('⚠️ Cole o HTML da planilha antes de analisar.', 'warning');
+    return;
+  }
+  const regional = document.getElementById('html-import-regional-select')?.value || undefined;
+  _importState.fileNames = ['colado'];
+  _importState.sites = parseRegionalHTML(html, regional);
+  _showHTMLImportPreview();
+}
+
+/**
+ * Load a minimal sample HTML table into the paste textarea for testing.
+ * The sample matches the positional column layout expected by _parseRowPositional.
+ */
+function loadHTMLImportSample() {
+  const sample = [
+    '<!DOCTYPE html><html><body><table>',
+    '<tr>',
+    '  <th>N</th><th>CONTA</th><th>SIGLA</th><th>STATUS</th><th>DATA</th>',
+    '  <th>O.S.</th><th>ZONA</th><th>STATUS4</th><th>PADRÃO DE CÂMERAS</th>',
+    '  <th>ONTEM</th><th>HOJE</th><th>STATUS2</th><th>DATA DA ALTERAÇÃO</th>',
+    '  <th>VEGETAÇÃO ALTA</th>',
+    '</tr>',
+    '<tr><td>1</td><td>1326</td><td>PRLDA01</td><td>ONLINE</td><td></td>',
+    '    <td></td><td>1</td><td>MONITORADO</td><td>4</td><td>4</td><td>4</td>',
+    '    <td>OK</td><td>2026-01-15</td><td>FALSO</td></tr>',
+    '<tr><td>2</td><td>1327</td><td>PRLDA02</td><td>DESCONECTADO</td><td>2026-02-10</td>',
+    '    <td></td><td>2</td><td>MONITORADO</td><td>8</td><td>0</td><td>0</td>',
+    '    <td>DESCONECTADO</td><td>2026-02-10</td><td>FALSO</td></tr>',
+    '<tr><td>3</td><td>1328</td><td>PRCWB01</td><td>ONLINE</td><td></td>',
+    '    <td></td><td>1</td><td>MONITORADO</td><td>6</td><td>4</td><td>4</td>',
+    '    <td>PARCIAL</td><td>2026-01-20</td><td>VERDADEIRO</td></tr>',
+    '</table></body></html>',
+  ].join('\n');
+
+  const el = document.getElementById('html-import-paste-input');
+  if (el) el.value = sample;
+  const selEl = document.getElementById('html-import-regional-select');
+  if (selEl) selEl.value = 'PR';
+  showToast('📄 HTML de exemplo carregado. Clique em Analisar HTML.', 'info', 3000);
+}
+
+/**
+ * Render the preview table with new/update badges.
+ * Each site is annotated with _existing (DB record or null) and _include (bool).
+ */
+function _showHTMLImportPreview() {
+  const sites = _importState.sites;
+  const section = document.getElementById('html-import-preview-section');
+  if (!section) return;
+
+  if (!sites.length) {
+    showToast(
+      '⚠️ Nenhum site encontrado. Verifique se o HTML contém a tabela no formato esperado (colunas SIGLA, CONTA).',
+      'warning', 6000
+    );
+    return;
   }
 
-  if (progressFill)  progressFill.style.width  = '100%';
-  if (progressText)  progressText.textContent  = 'Concluído!';
+  // Annotate with DB existence (getSiteBySigla returns null when not found, so the
+  // catch only fires for unexpected DB errors — the site is treated as new in that case)
+  const annotated = sites.map(s => {
+    let existing = null;
+    try { existing = getSiteBySigla(s.sigla); } catch (e) {
+      console.warn('[_showHTMLImportPreview] getSiteBySigla error for', s.sigla, e);
+    }
+    return { ...s, _existing: existing };
+  });
+  _importState.sites = annotated;
 
-  // Mostrar resultado
-  if (resultEl) {
-    resultEl.style.display = '';
-    resultEl.innerHTML = `
-      <div class="import-result-row">
-        <span>✅ Sites novos criados:</span>
-        <span style="color:var(--ok)">${totalImported}</span>
-      </div>
-      <div class="import-result-row">
-        <span>🔄 Sites atualizados:</span>
-        <span style="color:var(--accent)">${totalUpdated}</span>
-      </div>
-      <div class="import-result-row">
-        <span>⏭️ Linhas ignoradas:</span>
-        <span style="color:var(--text-muted)">${totalSkipped}</span>
-      </div>
-      ${allErrors.length ? `
-      <div class="import-result-row">
-        <span>⚠️ Erros:</span>
-        <span style="color:var(--offline)">${allErrors.length}</span>
-      </div>` : ''}
-    `;
+  const newCount = annotated.filter(s => !s._existing).length;
+  const updCount = annotated.filter(s =>  s._existing).length;
+
+  const countEl = document.getElementById('html-import-preview-count');
+  if (countEl) {
+    countEl.innerHTML =
+      `<strong>${annotated.length}</strong> sites encontrados &mdash; ` +
+      `<span class="preview-count-new">${newCount} novos</span>` +
+      ` / <span class="preview-count-upd">${updCount} já existentes</span>`;
   }
 
-  if (importBtn) {
-    importBtn.textContent = '✅ Fechar';
-    importBtn.disabled    = false;
-    importBtn.onclick     = () => {
-      _closeImporterModal();
-      refreshDashboard();
-      renderSitesList();
-    };
+  const tbody = document.getElementById('html-import-preview-tbody');
+  if (tbody) {
+    tbody.innerHTML = annotated.map(s => {
+      const badge = s._existing
+        ? '<span class="preview-badge preview-badge-update" aria-label="Atualizar site existente">atualizar</span>'
+        : '<span class="preview-badge preview-badge-new" aria-label="Novo site">novo</span>';
+
+      const alarmClass  = typeof connectionStatusClass === 'function' ? connectionStatusClass(s.status_conexao) : '';
+      const cftvClass   = typeof status2Class           === 'function' ? status2Class(s.status2) : '';
+      const obs = (s.observacao || '');
+      const obsShort = obs.length > 35 ? obs.slice(0, 35) + '…' : obs;
+
+      return `
+        <tr class="preview-row ${s._existing ? 'preview-row-update' : 'preview-row-new'}">
+          <td><span class="badge-regional badge-regional-${escapeHtml(s.regional || '')}">${escapeHtml(s.regional || '-')}</span></td>
+          <td><strong class="preview-sigla">${escapeHtml(s.sigla)}</strong></td>
+          <td>${s.conta || '-'}</td>
+          <td><span class="badge ${alarmClass}">${escapeHtml(s.status_conexao || '-')}</span></td>
+          <td><span class="badge ${cftvClass}">${escapeHtml(s.status2 || '-')}</span></td>
+          <td>${s.padrao_cameras !== null && s.padrao_cameras !== undefined ? s.padrao_cameras : '-'}</td>
+          <td>${s.vegetacao_alta ? '🌿' : ''}</td>
+          <td class="preview-obs-cell" title="${escapeHtml(obs)}">${escapeHtml(obsShort)}</td>
+          <td>${badge}</td>
+        </tr>
+      `;
+    }).join('');
   }
 
-  // Also update a "Cancel" button to "Fechar"
-  const cancelBtn = document.querySelector('#importer-modal-overlay .btn-outline');
-  if (cancelBtn) {
-    cancelBtn.textContent = 'Fechar';
-    cancelBtn.onclick     = () => {
-      _closeImporterModal();
-      refreshDashboard();
-      renderSitesList();
-    };
+  const confirmBtn = document.getElementById('html-import-confirm-btn');
+  if (confirmBtn) confirmBtn.textContent = `✅ Importar ${annotated.length} Sites`;
+
+  section.classList.remove('hidden');
+  section.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+/**
+ * Commit the previewed sites to the database.
+ * Respects the merge/skip duplicate mode chosen by the user.
+ */
+function confirmHTMLImport() {
+  const sites = _importState.sites;
+  if (!sites.length) return;
+
+  const dupMode = document.getElementById('html-import-dup-mode')?.value || 'merge';
+
+  let imported = 0, updated = 0, skipped = 0;
+  const errors = [];
+
+  db.run('BEGIN TRANSACTION');
+  try {
+    for (const site of sites) {
+      try {
+        if (!site.sigla) { skipped++; continue; }
+        if (site._existing && dupMode === 'skip') { skipped++; continue; }
+        upsertSite(site);
+        if (site._existing) updated++; else imported++;
+      } catch (e) {
+        errors.push(`${site.sigla}: ${e.message}`);
+        skipped++;
+      }
+    }
+    db.run('COMMIT');
+    saveDatabase();
+  } catch (e) {
+    db.run('ROLLBACK');
+    showToast(`❌ Erro ao salvar: ${e.message}`, 'error', 6000);
+    console.error('[confirmHTMLImport]', e);
+    return;
   }
+
+  if (errors.length) console.warn('[HTML import errors]', errors);
 
   showToast(
-    `✅ Importação concluída: ${totalImported} novos, ${totalUpdated} atualizados`,
-    'success', 4000
+    `✅ Importação concluída: ${imported} novos, ${updated} atualizados, ${skipped} ignorados`,
+    'success', 5000
   );
 
-  _importerState.loading = false;
+  closeHTMLImportModal();
+  refreshDashboard();
+  renderSitesList();
+}
+
+// ─── File Reading Helper ──────────────────────────────────────────────────────
+
+/**
+ * Read a File object as UTF-8 text.
+ * @param {File} file
+ * @returns {Promise<string>}
+ */
+function _readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload  = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error(`Erro ao ler ${file.name}`));
+    reader.readAsText(file, 'utf-8');
+  });
 }
