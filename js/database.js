@@ -67,6 +67,8 @@ function createSchema() {
       data_alteracao_vegetacao TEXT,
       camera_problema TEXT,
       status3 TEXT,
+      regional TEXT,
+      observacao TEXT,
       created_at TEXT DEFAULT (datetime('now')),
       updated_at TEXT DEFAULT (datetime('now'))
     );
@@ -102,6 +104,8 @@ function runMigrations() {
       ['sites', 'data_alteracao', 'TEXT'],
       ['sites', 'camera_problema', 'TEXT'],
       ['sites', 'status3', 'TEXT'],
+      ['sites', 'regional', 'TEXT'],
+      ['sites', 'observacao', 'TEXT'],
     ];
     for (const [table, col, type] of columns) {
       try {
@@ -165,8 +169,8 @@ function upsertSite(site) {
        conta, sigla, status_conexao, data_desconexao, os, zona, status4,
        padrao_cameras, cameras_ontem, cameras_hoje, status2, data_alteracao,
        vegetacao_alta, data_alteracao_vegetacao, camera_problema, status3,
-       updated_at
-     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
+       regional, observacao, updated_at
+     ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?, datetime('now'))
      ON CONFLICT(sigla) DO UPDATE SET
        conta = excluded.conta,
        status_conexao = excluded.status_conexao,
@@ -183,6 +187,8 @@ function upsertSite(site) {
        data_alteracao_vegetacao = excluded.data_alteracao_vegetacao,
        camera_problema = excluded.camera_problema,
        status3 = excluded.status3,
+       regional = COALESCE(excluded.regional, regional),
+       observacao = COALESCE(excluded.observacao, observacao),
        updated_at = datetime('now')`,
     [
       site.conta ?? null,
@@ -200,7 +206,9 @@ function upsertSite(site) {
       site.vegetacao_alta ? 1 : 0,
       site.data_alteracao_vegetacao ?? null,
       site.camera_problema ?? null,
-      site.status3 ?? null
+      site.status3 ?? null,
+      site.regional ?? null,
+      site.observacao ?? null,
     ]
   );
 }
@@ -238,7 +246,7 @@ function updateSite(id, fields) {
   saveDatabase();
 }
 
-function searchSites(query, filter) {
+function searchSites(query, filter, regional) {
   let sql = `
     SELECT s.*,
       (SELECT status FROM rondas WHERE site_id = s.id ORDER BY timestamp DESC LIMIT 1) AS ultimo_status_ronda,
@@ -255,9 +263,16 @@ function searchSites(query, filter) {
     params.push(`%${query}%`, `%${query}%`);
   }
 
+  if (regional && regional !== 'todos') {
+    sql += ` AND s.regional = ?`;
+    params.push(regional);
+  }
+
   if (filter && filter !== 'todos') {
     if (filter === 'os') {
       sql += ` AND s.os != '' AND s.os IS NOT NULL`;
+    } else if (filter === 'vegetacao') {
+      sql += ` AND s.vegetacao_alta = 1`;
     } else if (filter === 'nao_verificado') {
       sql += ` AND (SELECT id FROM rondas WHERE site_id = s.id LIMIT 1) IS NULL`;
     } else {
@@ -343,6 +358,18 @@ function getDashboardStats() {
   `;
   const stats = db.exec(statusQuery)[0]?.values[0] || [0, 0, 0, 0];
 
+  // Alarm & CFTV stats from imported spreadsheet data
+  const extraStats = db.exec(`
+    SELECT
+      SUM(CASE WHEN status_conexao = 'ONLINE' THEN 1 ELSE 0 END) as alarmes_conectados,
+      SUM(CASE WHEN status_conexao = 'DESCONECTADO' THEN 1 ELSE 0 END) as alarmes_desconectados,
+      SUM(CASE WHEN status2 = 'OK' THEN 1 ELSE 0 END) as cftv_ok,
+      SUM(CASE WHEN status2 = 'PARCIAL' THEN 1 ELSE 0 END) as cftv_parcial,
+      SUM(CASE WHEN status2 = 'DESCONECTADO' THEN 1 ELSE 0 END) as cftv_desconectado,
+      SUM(CASE WHEN vegetacao_alta = 1 THEN 1 ELSE 0 END) as vegetacao_alta
+    FROM sites
+  `)[0]?.values[0] || [0, 0, 0, 0, 0, 0];
+
   // Critical: offline with connection status DESCONECTADO or offline ronda > 7 days
   const criticos = db.exec(`
     SELECT s.*, r.timestamp as ultima_ronda_ts, r.status as ultimo_status
@@ -374,8 +401,45 @@ function getDashboardStats() {
     parcial: Number(stats[1]) || 0,
     offline: Number(stats[2]) || 0,
     nao_verificado: Number(stats[3]) || 0,
+    alarmes_conectados: Number(extraStats[0]) || 0,
+    alarmes_desconectados: Number(extraStats[1]) || 0,
+    cftv_ok: Number(extraStats[2]) || 0,
+    cftv_parcial: Number(extraStats[3]) || 0,
+    cftv_desconectado: Number(extraStats[4]) || 0,
+    vegetacao_alta: Number(extraStats[5]) || 0,
     criticos: criticosList
   };
+}
+
+/**
+ * Get stats broken down by regional (PR, SC, RS)
+ */
+function getRegionalStats() {
+  const result = db.exec(`
+    SELECT
+      COALESCE(regional, 'N/D') as regional,
+      COUNT(*) as total,
+      SUM(CASE WHEN status_conexao = 'ONLINE' THEN 1 ELSE 0 END) as alarmes_conectados,
+      SUM(CASE WHEN status_conexao = 'DESCONECTADO' THEN 1 ELSE 0 END) as alarmes_desconectados,
+      SUM(CASE WHEN status2 = 'OK' THEN 1 ELSE 0 END) as cftv_ok,
+      SUM(CASE WHEN status2 = 'PARCIAL' THEN 1 ELSE 0 END) as cftv_parcial,
+      SUM(CASE WHEN status2 = 'DESCONECTADO' THEN 1 ELSE 0 END) as cftv_desconectado,
+      SUM(CASE WHEN vegetacao_alta = 1 THEN 1 ELSE 0 END) as vegetacao_alta
+    FROM sites
+    GROUP BY regional
+    ORDER BY
+      CASE regional WHEN 'PR' THEN 1 WHEN 'SC' THEN 2 WHEN 'RS' THEN 3 ELSE 4 END
+  `);
+
+  const stats = {};
+  if (result[0]) {
+    for (const row of result[0].values) {
+      const obj = {};
+      result[0].columns.forEach((c, i) => { obj[c] = row[i]; });
+      stats[obj.regional] = obj;
+    }
+  }
+  return stats;
 }
 
 // ─── Full Export / Import ─────────────────────────────────────────────────────
