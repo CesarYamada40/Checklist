@@ -585,6 +585,87 @@ html, body {
 .ronda-badge-os { background: rgba(59,130,246,.15); color: var(--accent); }
 .ronda-badge-veg { background: rgba(16,185,129,.1); color: #34d399; }
 
+/* ─── Ronda: Top row (badge + regional) ─────────────────────────────────── */
+.ronda-site-top-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* ─── Ronda: Contextual alerts ───────────────────────────────────────────── */
+.ronda-alerts {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-width: 520px;
+}
+.ronda-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 8px;
+  font-size: .88rem;
+  text-align: left;
+  line-height: 1.4;
+}
+.ronda-alert-os       { background: rgba(59,130,246,.12); color: var(--accent); border-left: 3px solid var(--accent); }
+.ronda-alert-veg      { background: rgba(16,185,129,.1);  color: #34d399;       border-left: 3px solid #34d399; }
+.ronda-alert-offline  { background: rgba(239,68,68,.12);  color: var(--offline);border-left: 3px solid var(--offline); }
+.ronda-alert-cam      { background: rgba(245,158,11,.12); color: var(--parcial);border-left: 3px solid var(--parcial); }
+.ronda-alert-recurrent{ background: rgba(168,85,247,.12); color: #a855f7;       border-left: 3px solid #a855f7; }
+
+/* ─── Ronda: Camera comparison ───────────────────────────────────────────── */
+.ronda-cam-comparison {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 20px;
+  width: 100%;
+  max-width: 480px;
+}
+.cam-col {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  min-width: 70px;
+}
+.cam-col-header {
+  font-size: .72rem;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+  white-space: nowrap;
+}
+.cam-col-count {
+  font-size: 1.6rem;
+  font-weight: 800;
+  color: var(--text);
+  line-height: 1;
+}
+.cam-col-count small { font-size: .65em; font-weight: 500; color: var(--text-muted); }
+.cam-col-label {
+  font-size: .72rem;
+  color: var(--text-muted);
+}
+.cam-col-sep {
+  color: var(--text-muted);
+  font-size: 1.2rem;
+  flex-shrink: 0;
+}
+.cam-count-ok   { color: var(--ok); }
+.cam-count-warn { color: var(--parcial); }
+.cam-nd         { color: var(--text-muted); }
+
 .ronda-actions {
   display: flex;
   gap: 16px;

@@ -162,6 +162,130 @@ function getRondaSummary() {
 }
 
 /**
+ * Build contextual alerts for a site in the ronda.
+ * @param {object} site - site DB object
+ * @param {object[]} recentRondas - last N rondas for this site
+ * @returns {string} HTML string
+ */
+function _buildRondaAlerts(site, recentRondas) {
+  const alerts = [];
+
+  // O.S. aberta
+  if (site.os) {
+    alerts.push({
+      icon: '⚠️',
+      text: `O.S. <strong>${escapeHtml(site.os)}</strong> aberta`,
+      cls: 'ronda-alert-os',
+    });
+  }
+
+  // Vegetação alta
+  if (site.vegetacao_alta) {
+    const vegDate = site.data_alteracao_vegetacao
+      ? ` desde ${_fmtDateRonda(site.data_alteracao_vegetacao)}` : '';
+    alerts.push({
+      icon: '🌿',
+      text: `Vegetação alta reportada${escapeHtml(vegDate)}`,
+      cls: 'ronda-alert-veg',
+    });
+  }
+
+  // Alarme desconectado há X dias
+  if (site.status_conexao === 'DESCONECTADO' && site.data_desconexao) {
+    const days = typeof daysSince === 'function' ? daysSince(site.data_desconexao) : 0;
+    if (days > 0) {
+      alerts.push({
+        icon: '🔴',
+        text: `Alarme desconectado há <strong>${days}</strong> dia${days !== 1 ? 's' : ''}`,
+        cls: 'ronda-alert-offline',
+      });
+    }
+  }
+
+  // Câmera com problema registrado
+  if (site.camera_problema) {
+    alerts.push({
+      icon: '📷',
+      text: `Câmera com problema: ${escapeHtml(site.camera_problema)}`,
+      cls: 'ronda-alert-cam',
+    });
+  }
+
+  // Recorrência: 3 ou mais das últimas rondas com problema
+  const problemCount = recentRondas.filter(r => r.status !== 'OK').length;
+  if (problemCount >= 3) {
+    alerts.push({
+      icon: '🔄',
+      text: `Problema recorrente — ${problemCount} das últimas ${recentRondas.length} rondas com falha`,
+      cls: 'ronda-alert-recurrent',
+    });
+  }
+
+  if (!alerts.length) return '';
+
+  return `<div class="ronda-alerts" role="alert" aria-label="Alertas do site">
+    ${alerts.map(a => `<div class="ronda-alert ${a.cls}">${a.icon} <span>${a.text}</span></div>`).join('')}
+  </div>`;
+}
+
+/**
+ * Build camera comparison panel (Ontem → Hoje → Última Ronda).
+ * @param {object} site
+ * @param {object|null} lastRonda
+ * @returns {string} HTML string
+ */
+function _buildCameraComparison(site, lastRonda) {
+  const padrao   = site.padrao_cameras;
+  const ontem    = site.cameras_ontem;
+  const hoje     = site.cameras_hoje;
+  const lastCams = lastRonda ? lastRonda.cameras_funcionando : null;
+
+  // Only render when at least some camera data is available
+  const hasData = (padrao != null) || (ontem != null) || (hoje != null);
+  if (!hasData) return '';
+
+  const fmtCam = (val, total) => {
+    if (val === null || val === undefined) return '<span class="cam-nd">—</span>';
+    const cls = (total != null && val < total) ? 'cam-count-warn' : 'cam-count-ok';
+    return `<span class="${cls}">${val}</span>${total != null ? `<small>/${total}</small>` : ''}`;
+  };
+
+  const ontemHtml  = fmtCam(ontem,    padrao);
+  const hojeHtml   = fmtCam(hoje,     padrao);
+  const rondaHtml  = lastCams !== null ? fmtCam(lastCams, lastRonda.cameras_esperadas ?? padrao) : null;
+
+  return `<div class="ronda-cam-comparison" aria-label="Comparação de câmeras">
+    <div class="cam-col">
+      <div class="cam-col-header">📊 Ontem</div>
+      <div class="cam-col-count">${ontemHtml}</div>
+      <div class="cam-col-label">câmeras</div>
+    </div>
+    <div class="cam-col-sep" aria-hidden="true">→</div>
+    <div class="cam-col">
+      <div class="cam-col-header">📅 Hoje</div>
+      <div class="cam-col-count">${hojeHtml}</div>
+      <div class="cam-col-label">câmeras</div>
+    </div>
+    ${rondaHtml !== null ? `
+    <div class="cam-col-sep" aria-hidden="true">|</div>
+    <div class="cam-col">
+      <div class="cam-col-header">✅ Última Ronda</div>
+      <div class="cam-col-count">${rondaHtml}</div>
+      <div class="cam-col-label">verificadas</div>
+    </div>` : ''}
+  </div>`;
+}
+
+/** Format a date string (YYYY-MM-DD) as DD/MM/YY for display in ronda. */
+function _fmtDateRonda(str) {
+  if (!str) return '';
+  try {
+    const [y, m, d] = str.split('T')[0].split('-');
+    return `${d}/${m}/${y.slice(2)}`;
+  } catch (_) { return str; }
+}
+
+/**
  * Render the ronda mode UI
  */
 function renderRondaScreen() {
@@ -172,17 +296,26 @@ function renderRondaScreen() {
   const current = rondaState.currentIndex + 1;
   const progress = Math.round((rondaState.currentIndex / total) * 100);
 
-  // Get last ronda info for this site
-  const lastRonda = getLastRondaBySite(site.id);
-  const lastStatus = lastRonda ? lastRonda.status : null;
-  const lastTs = lastRonda ? formatDateTime(lastRonda.timestamp) : 'Nunca';
+  // Get last ronda info and recent history for this site
+  const lastRonda   = getLastRondaBySite(site.id);
+  const recentRondas = getRondasBySite(site.id, 5);
+
+  const lastStatus  = lastRonda ? lastRonda.status : null;
+  const lastTs      = lastRonda ? formatDateTime(lastRonda.timestamp) : 'Nunca';
   const lastOperador = lastRonda ? lastRonda.operador : '';
 
   const statusClass = lastStatus ? statusToClass(lastStatus) : 'status-unknown';
   const statusLabel = lastStatus || 'Não verificado';
 
-  const cameras = site.padrao_cameras || '?';
-  const camerasHoje = site.cameras_hoje || '?';
+  const cameras  = site.padrao_cameras || '?';
+  const camerasHoje = site.cameras_hoje;
+
+  const alertsHtml     = _buildRondaAlerts(site, recentRondas);
+  const camCompHtml    = _buildCameraComparison(site, lastRonda);
+
+  const regionalBadge = site.regional
+    ? `<span class="badge-regional badge-regional-${escapeHtml(site.regional)}" style="font-size:.75rem;padding:2px 8px">${escapeHtml(site.regional)}</span>`
+    : '';
 
   document.getElementById('screen-ronda').innerHTML = `
     <div class="ronda-header">
@@ -197,23 +330,22 @@ function renderRondaScreen() {
     </div>
 
     <div class="ronda-site-card">
-      <div class="ronda-site-badge ${statusClass}">${statusLabel}</div>
-      <h1 class="ronda-site-sigla">${escapeHtml(site.sigla)}</h1>
-      ${site.conta ? `<div class="ronda-site-sub">Conta: ${site.conta}</div>` : ''}
-
-      <div class="ronda-cameras-info">
-        <span class="cam-expected">${cameras} câmeras esperadas</span>
-        ${camerasHoje !== '?' ? `<span class="cam-hoje">${camerasHoje}/${cameras} hoje</span>` : ''}
+      <div class="ronda-site-top-row">
+        <div class="ronda-site-badge ${statusClass}">${statusLabel}</div>
+        ${regionalBadge}
       </div>
+      <h1 class="ronda-site-sigla">${escapeHtml(site.sigla)}</h1>
+      ${site.conta ? `<div class="ronda-site-sub">Conta: ${site.conta}${site.zona ? ` · Zona ${escapeHtml(site.zona)}` : ''}</div>` : ''}
+
+      ${alertsHtml}
+
+      ${camCompHtml}
 
       <div class="ronda-last-info">
         Última ronda: <strong>${escapeHtml(statusLabel)}</strong>
         ${lastTs !== 'Nunca' ? `em ${lastTs}` : ''}
         ${lastOperador ? `por ${escapeHtml(lastOperador)}` : ''}
       </div>
-
-      ${site.os ? `<div class="ronda-badge-os">📋 O.S. Aberta</div>` : ''}
-      ${site.vegetacao_alta ? `<div class="ronda-badge-veg">🌿 Vegetação Alta</div>` : ''}
 
       <div class="ronda-actions">
         <button class="btn-ronda btn-ok" onclick="markCurrentSite('OK')" title="Atalho: Espaço">
