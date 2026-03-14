@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>🎯 Checklist CFTV - Claro Regional Sul</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+  <!-- ═══════════════════════════════════════════════════════ LOADING SCREEN -->
+  <div id="screen-loading" class="screen">
+    <div class="spinner"></div>
+    <div class="loading-title">🎯 Checklist CFTV</div>
+    <div id="loading-msg">Inicializando...</div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ LOGIN SCREEN -->
+  <div id="screen-login" class="screen hidden">
+    <div class="login-card">
+      <div class="login-logo">🎯</div>
+      <div class="login-title">Checklist CFTV</div>
+      <div class="login-sub">Claro Regional Sul · PR · SC · RS</div>
+
+      <div class="login-input-wrap">
+        <input
+          type="text"
+          id="login-name"
+          placeholder="Seu nome (ex: João Silva)"
+          autocomplete="off"
+          maxlength="60"
+        >
+      </div>
+      <div id="login-error" class="login-error"></div>
+      <button class="btn btn-primary btn-full" onclick="doLogin()">Entrar →</button>
+
+      <div id="login-recent-wrap" class="login-recent">
+        <div class="login-recent-label">Acessos recentes:</div>
+        <div id="recent-operators" class="operators-list hidden"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ MAIN SCREEN -->
+  <div id="screen-main" class="screen hidden">
+
+    <!-- Header -->
+    <header class="app-header">
+      <div class="app-logo">🎯 CFTV</div>
+      <span class="header-spacer"></span>
+      <div class="operator-badge">
+        👤 Operador: <strong id="operator-name">—</strong>
+      </div>
+      <button class="btn-logout" onclick="doLogout()">Sair</button>
+    </header>
+
+    <div class="app-body">
+
+      <!-- Sidebar: Dashboard -->
+      <aside class="sidebar">
+
+        <!-- Stats -->
+        <div>
+          <div class="sidebar-section-title">📊 Dashboard</div>
+          <div class="stats-grid">
+            <div class="stat-box stat-total" style="grid-column: 1/-1;">
+              <div class="stat-number" id="stat-total">0</div>
+              <div class="stat-label">⚫ Total de Sites</div>
+            </div>
+            <div class="stat-box stat-ok">
+              <div class="stat-number" id="stat-ok">0</div>
+              <div class="stat-label">🟢 OK</div>
+            </div>
+            <div class="stat-box stat-parcial">
+              <div class="stat-number" id="stat-parcial">0</div>
+              <div class="stat-label">🟡 Parcial</div>
+            </div>
+            <div class="stat-box stat-offline">
+              <div class="stat-number" id="stat-offline">0</div>
+              <div class="stat-label">🔴 Offline</div>
+            </div>
+            <div class="stat-box">
+              <div class="stat-number" id="stat-nv">0</div>
+              <div class="stat-label">⚫ Não Verif.</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pie Chart -->
+        <div>
+          <div class="sidebar-section-title">Distribuição</div>
+          <div class="chart-wrap">
+            <canvas id="status-chart"></canvas>
+          </div>
+        </div>
+
+        <!-- Action Buttons -->
+        <div>
+          <div class="sidebar-section-title">Ações</div>
+          <div class="action-buttons">
+            <button class="btn btn-primary btn-full" onclick="triggerStartRonda()">
+              🚀 Iniciar Ronda
+            </button>
+            <button class="btn btn-secondary btn-full" onclick="triggerXLSXImport()">
+              📥 Importar XLSX
+            </button>
+            <button class="btn btn-secondary btn-full" onclick="exportSync()">
+              📤 Exportar Sync
+            </button>
+            <button class="btn btn-secondary btn-full" onclick="triggerImportSync()">
+              📥 Importar Sync
+            </button>
+            <button class="btn btn-outline btn-full" onclick="exportToXLSX(searchSites('','todos'))">
+              📊 Exportar XLSX
+            </button>
+            <button class="btn btn-outline btn-full" onclick="exportDatabaseBackup()">
+              💾 Backup DB
+            </button>
+          </div>
+        </div>
+
+        <!-- Critical Sites -->
+        <div>
+          <div class="sidebar-section-title">⚠️ Sites Críticos</div>
+          <div id="criticos-list">
+            <p class="empty-msg">Carregando...</p>
+          </div>
+        </div>
+
+      </aside>
+
+      <!-- Main Content: Sites List -->
+      <main class="main-content">
+
+        <!-- Toolbar -->
+        <div class="toolbar">
+          <div class="search-wrap">
+            <span class="search-icon">🔍</span>
+            <input
+              type="search"
+              id="search-input"
+              placeholder="Buscar por sigla ou conta..."
+              autocomplete="off"
+            >
+          </div>
+        </div>
+
+        <!-- Filters -->
+        <div class="filter-bar">
+          <button class="filter-btn active" data-filter="todos" onclick="setFilter('todos')">Todos</button>
+          <button class="filter-btn" data-filter="ok" onclick="setFilter('ok')">🟢 OK</button>
+          <button class="filter-btn" data-filter="parcial" onclick="setFilter('parcial')">🟡 Parcial</button>
+          <button class="filter-btn" data-filter="offline" onclick="setFilter('offline')">🔴 Offline</button>
+          <button class="filter-btn" data-filter="nao_verificado" onclick="setFilter('nao_verificado')">⚫ Não Verif.</button>
+          <button class="filter-btn" data-filter="os" onclick="setFilter('os')">📋 Com O.S.</button>
+        </div>
+
+        <!-- Sites Grid -->
+        <div id="sites-list" class="sites-grid">
+          <div class="empty-state">
+            <div class="empty-icon">📋</div>
+            <p>Carregando sites...</p>
+          </div>
+        </div>
+
+      </main>
+    </div>
+
+    <!-- Ronda Mode (embedded in main screen) -->
+
+  </div>
+
+  <!-- ════════════════════════════════════════════════════════ RONDA SCREEN -->
+  <div id="screen-ronda" class="screen hidden">
+    <!-- Content rendered dynamically by ronda.js -->
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════════ DETAIL SCREEN -->
+  <div id="screen-detail" class="screen hidden">
+    <div id="site-detail-content">
+      <!-- Content rendered dynamically by app.js -->
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ MODAL OVERLAY -->
+  <div id="modal-overlay" class="hidden"></div>
+
+  <!-- ═══════════════════════════════════════════════════════ TOAST CONTAINER -->
+  <div id="toast-container"></div>
+
+  <!-- ═══════════════════════════════════════════════════════════ LIBRARIES -->
+  <!-- sql.js: SQLite in the browser (local) -->
+  <script src="libs/sql-wasm.js"></script>
+  <!-- SheetJS: XLSX read/write (local) -->
+  <script src="libs/xlsx.full.min.js"></script>
+  <!-- Chart.js: Pie/Doughnut chart (local) -->
+  <script src="libs/chart.umd.min.js"></script>
+
+  <!-- ══════════════════════════════════════════════════════ APP SCRIPTS -->
+  <script src="js/database.js"></script>
+  <script src="js/xlsx-import.js"></script>
+  <script src="js/sync.js"></script>
+  <script src="js/ronda.js"></script>
+  <script src="js/app.js"></script>
+
+</body>
+</html>
