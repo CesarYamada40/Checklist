@@ -5,26 +5,39 @@
 
 /**
  * Column name mappings (normalized → possible spreadsheet column names)
+ * Supports both English and Portuguese headers as exported from Google Sheets/Excel.
  */
 const COLUMN_MAP = {
   conta:                   ['CONTA', 'conta', 'ID', 'id'],
   sigla:                   ['SIGLA', 'sigla', 'SITE', 'site', 'Nome', 'NOME'],
-  status_conexao:          ['STATUS', 'status', 'STATUS CONEXÃO', 'Status Conexão', 'ALARME', 'STATUS ALARME'],
-  data_desconexao:         ['DATA', 'data', 'DATA DESCONEXÃO', 'Data Desconexão'],
-  os:                      ['O.S', 'OS', 'O.S.', 'os', 'Ordem de Serviço'],
-  zona:                    ['ZONA', 'zona', 'Zona'],
+  status_conexao:          ['STATUS', 'status', 'STATUS CONEXÃO', 'STATUS CONEXAO', 'Status Conexão',
+                            'ALARME', 'STATUS ALARME', 'STATUS DO ALARME'],
+  data_desconexao:         ['DATA', 'data', 'DATA DESCONEXÃO', 'DATA DESCONEXAO', 'Data Desconexão',
+                            'DATA DE DESCONEXÃO', 'DATA DE DESCONEXAO'],
+  os:                      ['O.S', 'OS', 'O.S.', 'os', 'Ordem de Serviço', 'ORDEM DE SERVIÇO',
+                            'ORDEM DE SERVICO', 'N TICKET', 'TICKET'],
+  zona:                    ['ZONA', 'zona', 'Zona', 'ZONA AFETADA'],
   status4:                 ['STATUS4', 'status4', 'STATUS 4'],
-  padrao_cameras:          ['PADRÃO DE CÂMERAS', 'PADRAO DE CAMERAS', 'CÂMERAS', 'Cameras', 'cameras', 'Qtd Cameras'],
-  cameras_ontem:           ['ONTEM', 'ontem', 'Cameras Ontem'],
-  cameras_hoje:            ['HOJE', 'hoje', 'Cameras Hoje'],
-  status2:                 ['STATUS2', 'status2', 'STATUS 2', 'STATUS CFTV', 'CFTV'],
-  data_alteracao:          ['DATA DA ALTERAÇÃO', 'DATA DA ALTERACAO', 'Data Alteração'],
-  vegetacao_alta:          ['VEGETAÇÃO ALTA', 'VEGETACAO ALTA', 'vegetacao_alta'],
-  data_alteracao_vegetacao:['DATA DE ALTERAÇÃO', 'DATA DE ALTERACAO', 'Data Alt. Vegetação'],
-  camera_problema:         ['CÂMERA', 'CAMERA', 'camera', 'Câmera Problema'],
-  status3:                 ['STATUS3', 'status3', 'STATUS 3'],
+  padrao_cameras:          ['PADRÃO DE CÂMERAS', 'PADRAO DE CAMERAS', 'CÂMERAS', 'CAMERAS',
+                            'Cameras', 'cameras', 'Qtd Cameras', 'PADRÃO', 'PADRAO',
+                            'QTD CÂMERAS', 'QTD CAMERAS'],
+  cameras_ontem:           ['ONTEM', 'ontem', 'Cameras Ontem', 'CÂMERAS ONTEM', 'CAMERAS ONTEM'],
+  cameras_hoje:            ['HOJE', 'hoje', 'Cameras Hoje', 'CÂMERAS HOJE', 'CAMERAS HOJE'],
+  status2:                 ['STATUS2', 'status2', 'STATUS 2', 'STATUS CFTV', 'CFTV',
+                            'STATUS DO CFTV', 'STATUS_CFTV'],
+  data_alteracao:          ['DATA DA ALTERAÇÃO', 'DATA DA ALTERACAO', 'Data Alteração',
+                            'DATA ALTERAÇÃO', 'DATA ALTERACAO', 'QUANDO'],
+  vegetacao_alta:          ['VEGETAÇÃO ALTA', 'VEGETACAO ALTA', 'vegetacao_alta',
+                            'VEGETAÇÃO', 'VEGETACAO', 'VEG ALTA'],
+  data_alteracao_vegetacao:['DATA DE ALTERAÇÃO', 'DATA DE ALTERACAO', 'Data Alt. Vegetação',
+                            'DATA ALT VEGETAÇÃO', 'DATA ALT VEGETACAO'],
+  camera_problema:         ['CÂMERA', 'CAMERA', 'camera', 'Câmera Problema', 'CÂMERA PROBLEMA',
+                            'CAMERA PROBLEMA', 'TIPO PROBLEMA'],
+  status3:                 ['STATUS3', 'status3', 'STATUS 3', 'STATUS_3'],
   regional:                ['REGIONAL', 'regional', 'ESTADO', 'UF', 'Estado'],
-  observacao:              ['OBSERVAÇÃO', 'OBSERVACAO', 'OBS', 'Observação', 'observacao', 'Obs.'],
+  observacao:              ['OBSERVAÇÃO', 'OBSERVACAO', 'OBS', 'Observação', 'observacao', 'Obs.',
+                            'O QUE HOUVE?', 'O QUE HOUVE', 'DESCRIÇÃO', 'DESCRICAO',
+                            'OBSERVAÇÕES', 'OBSERVACOES'],
 };
 
 /**
@@ -55,11 +68,30 @@ function findColumnValue(row, candidates) {
 }
 
 /**
- * Convert Excel date serial number or string to ISO date string
+ * Convert Excel date serial number, ISO date string, or Brazilian DD/MM/AA(AA) to ISO date string.
+ * Returns null if value is empty or cannot be parsed.
  */
 function excelDateToString(value) {
   if (!value) return null;
-  if (typeof value === 'string') return value.trim() || null;
+  if (typeof value === 'string') {
+    const s = value.trim();
+    if (!s) return null;
+    // Brazilian format: DD/MM/AA or DD/MM/AAAA
+    const brMatch = s.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})$/);
+    if (brMatch) {
+      const [, d, m, y] = brMatch;
+      // Two-digit years: use current century, with a 10-year lookahead cutoff
+      let year;
+      if (y.length === 2) {
+        const pivot = (new Date().getFullYear() % 100) + 10;
+        year = parseInt(y, 10) <= pivot ? `20${y}` : `19${y}`;
+      } else {
+        year = y;
+      }
+      return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+    }
+    return s;
+  }
   if (typeof value === 'number') {
     // Excel serial date: days since 1900-01-01
     const date = new Date(Math.round((value - 25569) * 86400 * 1000));
@@ -72,13 +104,14 @@ function excelDateToString(value) {
 }
 
 /**
- * Parse boolean-like values
+ * Parse boolean-like values, including Portuguese VERDADEIRO/FALSO.
  */
 function parseBool(value) {
   if (!value) return false;
   if (typeof value === 'boolean') return value;
   const s = String(value).toUpperCase().trim();
-  return s === 'TRUE' || s === '1' || s === 'SIM' || s === 'S';
+  return s === 'TRUE' || s === '1' || s === 'SIM' || s === 'S' ||
+         s === 'VERDADEIRO' || s === 'V';
 }
 
 /**

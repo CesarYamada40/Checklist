@@ -146,9 +146,130 @@ function seedDemoDataIfEmpty() {
   }
 }
 
+// ─── HTML Column Mapping Helpers ──────────────────────────────────────────────
+
+/**
+ * Build a field→columnIndex map from a header row.
+ * Uses COLUMN_MAP (from xlsx-import.js) with case-insensitive partial matching.
+ * Falls back to positional mapping when the standard header keyword format is detected.
+ *
+ * @param {string[]} headerTexts  Normalised (trimmed, upper-cased) header cell texts
+ * @returns {object}  { field: columnIndex, ... }
+ */
+function _buildColIndex(headerTexts) {
+  const colIndex = {};
+
+  if (typeof COLUMN_MAP !== 'undefined') {
+    for (const [field, candidates] of Object.entries(COLUMN_MAP)) {
+      // Pre-compute upper-cased candidates once per field
+      const upperCandidates = candidates.map(c => c.toUpperCase());
+      for (let j = 0; j < headerTexts.length; j++) {
+        const h = headerTexts[j];
+        if (upperCandidates.some(c => h === c || h.includes(c))) {
+          if (colIndex[field] === undefined) colIndex[field] = j; // first match wins
+          break;
+        }
+      }
+    }
+  }
+
+  // Minimal fallback for files that have common keywords even without COLUMN_MAP
+  headerTexts.forEach((t, j) => {
+    if (colIndex.conta === undefined && t === 'CONTA') colIndex.conta = j;
+    if (colIndex.sigla === undefined && (t === 'SIGLA' || t === 'SITE' || t === 'NOME')) colIndex.sigla = j;
+    if (colIndex.status_conexao === undefined && (t === 'STATUS' || t === 'ALARME')) colIndex.status_conexao = j;
+  });
+
+  return colIndex;
+}
+
+/**
+ * Apply positional column mapping for the known fixed-column HTML export format:
+ *   Col 0: seq#, Col 1: CONTA, Col 2: SIGLA, Col 3: STATUS,
+ *   Col 4: DATA, Col 5: O.S., Col 6: ZONA, Col 7: STATUS4,
+ *   Col 8: PADRÃO CÂMERAS, Col 9: ONTEM, Col 10: HOJE, Col 11: STATUS2,
+ *   Col 12: DATA ALTERAÇÃO, Col 13: VEGETAÇÃO, Col 14–28: camera cols,
+ *   Col 29–31: observações / data / ticket
+ *
+ * Only applies when at least CONTA (col 1) and SIGLA (col 2) look valid.
+ *
+ * @param {string[]} vals  Cell values for a data row
+ * @param {string|null} regional
+ * @returns {object|null}  Parsed site object, or null if row looks invalid
+ */
+function _parseRowPositional(vals, regional) {
+  const sigla = (vals[2] || '').trim().toUpperCase();
+  // Validate sigla: 2–10 chars, starts with 2 letters, rest alphanumeric
+  if (!sigla || !/^[A-Z]{2}[A-Z0-9]{0,8}$/.test(sigla)) return null;
+
+  const conta = parseInt(vals[1], 10) || null;
+
+  // Derive regional from sigla prefix if not provided
+  let reg = regional;
+  if (!reg && sigla.length >= 2) {
+    const prefix = sigla.slice(0, 2);
+    if (['PR', 'SC', 'RS'].includes(prefix)) reg = prefix;
+  }
+
+  const statusConexao = (vals[3] || '').trim().toUpperCase() || null;
+  const dataDesconexao = (typeof excelDateToString === 'function')
+    ? excelDateToString(vals[4] || '') : (vals[4] || null);
+  const os   = (vals[5] || '').trim() || null;
+  const zona = (vals[6] || '').trim() || null;
+  const status4 = (vals[7] || '').trim() || null;
+
+  const padrao   = parseInt(vals[8],  10) || null;
+  const ontem    = parseInt(vals[9],  10);
+  const hoje     = parseInt(vals[10], 10);
+  const status2  = (vals[11] || '').trim().toUpperCase() || null;
+  const dataAlt  = (typeof excelDateToString === 'function')
+    ? excelDateToString(vals[12] || '') : (vals[12] || null);
+
+  // Use parseBool from xlsx-import.js (handles VERDADEIRO/FALSO/TRUE/FALSE/SIM)
+  const vegetacao = (typeof parseBool === 'function')
+    ? parseBool(vals[13])
+    : (vals[13] || '').trim().toUpperCase() === 'VERDADEIRO' ||
+      (vals[13] || '').trim().toUpperCase() === 'TRUE';
+
+  // Camera problem: look for a cell in columns 14-28 that contains a problem emoji/keyword
+  let cameraProblema = null;
+  for (let k = 14; k <= Math.min(28, vals.length - 1); k++) {
+    const v = (vals[k] || '').trim();
+    if (v && v !== '-' && v !== '0' && /[⬛🔶📶❌]|ESCURA|OBSTRU|SEM SINAL|OFFLINE|PROBLEMA/i.test(v)) {
+      cameraProblema = cameraProblema ? `${cameraProblema}, ${v}` : v;
+    }
+  }
+
+  // Observation: cols 29-31 (O QUE HOUVE?, QUANDO, N TICKET)
+  const obsCols = vals.slice(29, 32).filter(v => v && v.trim() && v.trim() !== '-');
+  const observacao = obsCols.length ? obsCols.join(' | ') : null;
+
+  return {
+    conta,
+    sigla,
+    regional: reg,
+    status_conexao: statusConexao,
+    data_desconexao: dataDesconexao || null,
+    os,
+    zona,
+    status4,
+    padrao_cameras: padrao,
+    cameras_ontem: isNaN(ontem) ? null : ontem,
+    cameras_hoje:  isNaN(hoje)  ? null : hoje,
+    status2,
+    data_alteracao: dataAlt || null,
+    vegetacao_alta: vegetacao,
+    data_alteracao_vegetacao: null,
+    camera_problema: cameraProblema,
+    status3: null,
+    observacao,
+  };
+}
+
 /**
  * Parse and import an HTML table string into the database.
- * Looks for <table> elements with CONTA / SIGLA column headers.
+ * Supports both named-column HTML exports and positional fixed-column format
+ * (Cols A-AF as exported from Google Sheets / Excel for PR, SC and RS regionals).
  *
  * @param {string} htmlContent  HTML string to parse
  * @param {string} [regional]   Regional override ('PR'|'SC'|'RS')
@@ -164,51 +285,57 @@ function importFromHTML(htmlContent, regional) {
   const tables = doc.querySelectorAll('table');
   if (!tables.length) throw new Error('Nenhuma tabela encontrada no arquivo HTML');
 
+  // Detect regional from page title or body text when no override given
+  const detectedRegional = regional ||
+    (typeof detectRegional === 'function'
+      ? detectRegional(doc.title, doc.body?.textContent?.slice(0, 200) || '')
+      : null);
+
   for (const table of tables) {
     const rows = Array.from(table.querySelectorAll('tr'));
     if (rows.length < 2) continue;
 
-    // Locate header row (first row whose cells mention CONTA or SIGLA)
+    // ── Find the header row ──────────────────────────────────────────────────
     let headerTexts = null;
-    let dataStart = 0;
+    let dataStart   = 0;
+    let usePositional = false;
 
-    for (let i = 0; i < Math.min(6, rows.length); i++) {
+    for (let i = 0; i < Math.min(8, rows.length); i++) {
       const cells = Array.from(rows[i].querySelectorAll('th,td'));
       if (cells.length < 3) continue;
       const texts = cells.map(c => c.textContent.trim().toUpperCase());
-      if (texts.some(t => t.includes('CONTA') || t.includes('SIGLA') || t.includes('SITE'))) {
+
+      const hasConta = texts.some(t => t === 'CONTA');
+      const hasSigla = texts.some(t => t === 'SIGLA' || t === 'SITE');
+
+      if (hasConta || hasSigla) {
         headerTexts = texts;
-        dataStart = i + 1;
+        dataStart   = i + 1;
         break;
       }
     }
 
-    if (!headerTexts) continue;
-
-    // Detect regional from doc title or file content
-    const detectedRegional = regional ||
-      (typeof detectRegional === 'function' ? detectRegional(doc.title, '') : null);
-
-    // Map field → column index using COLUMN_MAP from xlsx-import.js
-    const colIndex = {};
-    if (typeof COLUMN_MAP !== 'undefined') {
-      for (const [field, candidates] of Object.entries(COLUMN_MAP)) {
-        for (let j = 0; j < headerTexts.length; j++) {
-          if (candidates.some(c => headerTexts[j].includes(c.toUpperCase()))) {
-            colIndex[field] = j;
-            break;
-          }
+    // No named-header found → try positional (fixed-column) detection
+    if (!headerTexts) {
+      // Check if first data row has a potential sigla in column index 2
+      for (let i = 0; i < Math.min(8, rows.length); i++) {
+        const cells = Array.from(rows[i].querySelectorAll('td'));
+        if (cells.length < 10) continue;
+        const vals = cells.map(c => c.textContent.trim());
+        const candidate = vals[2] || '';
+        if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test(candidate.toUpperCase())) {
+          dataStart     = i;
+          usePositional = true;
+          break;
         }
       }
-    } else {
-      // Minimal fallback mapping
-      headerTexts.forEach((t, j) => {
-        if (t.includes('CONTA')) colIndex.conta = j;
-        if (t.includes('SIGLA') || t.includes('SITE')) colIndex.sigla = j;
-        if (t.includes('STATUS')) colIndex.status_conexao = j;
-      });
+      if (!usePositional) continue; // cannot parse this table
     }
 
+    // ── Build column-index map for named-header mode ─────────────────────────
+    const colIndex = headerTexts ? _buildColIndex(headerTexts) : {};
+
+    // ── Process data rows ────────────────────────────────────────────────────
     db.run('BEGIN TRANSACTION');
     try {
       for (let i = dataStart; i < rows.length; i++) {
@@ -216,30 +343,40 @@ function importFromHTML(htmlContent, regional) {
         if (cells.length < 2) { skipped++; continue; }
 
         const vals = cells.map(c => c.textContent.trim());
-        const row = {};
-        for (const [field, idx] of Object.entries(colIndex)) {
-          if (idx !== undefined && idx < vals.length && vals[idx] !== '') {
-            const colName = typeof COLUMN_MAP !== 'undefined' ? COLUMN_MAP[field][0] : field;
-            row[colName] = vals[idx];
-          }
-        }
 
         try {
           let site;
-          if (typeof parseRow !== 'undefined') {
-            site = parseRow(row, detectedRegional);
+
+          if (usePositional) {
+            site = _parseRowPositional(vals, detectedRegional);
           } else {
-            const siglaVal = vals[colIndex.sigla ?? 1];
-            if (!siglaVal) { skipped++; continue; }
-            site = { sigla: String(siglaVal).trim().toUpperCase(), regional: detectedRegional };
+            // Build a row-object keyed by COLUMN_MAP first candidate
+            const rowObj = {};
+            for (const [field, idx] of Object.entries(colIndex)) {
+              if (idx !== undefined && idx < vals.length && vals[idx] !== '') {
+                const colName = (typeof COLUMN_MAP !== 'undefined')
+                  ? COLUMN_MAP[field][0] : field;
+                rowObj[colName] = vals[idx];
+              }
+            }
+            if (typeof parseRow !== 'undefined') {
+              site = parseRow(rowObj, detectedRegional);
+            } else {
+              // In named-header mode, require that sigla was found in the headers
+              if (colIndex.sigla === undefined) { skipped++; continue; }
+              const siglaVal = vals[colIndex.sigla] || '';
+              if (!siglaVal) { skipped++; continue; }
+              site = { sigla: siglaVal.trim().toUpperCase(), regional: detectedRegional };
+            }
           }
+
           if (!site || !site.sigla) { skipped++; continue; }
 
           const existing = getSiteBySigla(site.sigla);
           upsertSite(site);
           if (existing) updated++; else imported++;
         } catch (e) {
-          errors.push(`Linha ${i}: ${e.message}`);
+          errors.push(`Linha ${i + 1}: ${e.message}`);
           skipped++;
         }
       }
@@ -252,6 +389,97 @@ function importFromHTML(htmlContent, regional) {
 
   saveDatabase();
   return { imported, updated, skipped, errors };
+}
+
+/**
+ * Parse an HTML regional spreadsheet and return structured site objects WITHOUT
+ * saving to the database.  Useful for preview, validation, or custom processing.
+ *
+ * @param {string} htmlContent   Full HTML string of the exported spreadsheet
+ * @param {string} [regionalCode] Override regional code ('PR'|'SC'|'RS').
+ *   If omitted, the regional is auto-detected from the page title / file name.
+ * @returns {object[]}  Array of site objects matching the database schema
+ *
+ * @example
+ *   const sites = parseRegionalHTML(htmlString, 'PR');
+ *   console.log(sites.length, 'sites found');
+ *   sites.forEach(s => console.log(s.sigla, s.status_conexao, s.status2));
+ */
+function parseRegionalHTML(htmlContent, regionalCode) {
+  const parser = new DOMParser();
+  const doc    = parser.parseFromString(htmlContent, 'text/html');
+
+  const regional = regionalCode ||
+    (typeof detectRegional === 'function'
+      ? detectRegional(doc.title, doc.body?.textContent?.slice(0, 200) || '')
+      : null);
+
+  const sites = [];
+
+  for (const table of doc.querySelectorAll('table')) {
+    const rows = Array.from(table.querySelectorAll('tr'));
+    if (rows.length < 2) continue;
+
+    let headerTexts = null;
+    let dataStart   = 0;
+    let usePositional = false;
+
+    for (let i = 0; i < Math.min(8, rows.length); i++) {
+      const cells = Array.from(rows[i].querySelectorAll('th,td'));
+      if (cells.length < 3) continue;
+      const texts = cells.map(c => c.textContent.trim().toUpperCase());
+      if (texts.some(t => t === 'CONTA') || texts.some(t => t === 'SIGLA' || t === 'SITE')) {
+        headerTexts = texts;
+        dataStart   = i + 1;
+        break;
+      }
+    }
+
+    if (!headerTexts) {
+      for (let i = 0; i < Math.min(8, rows.length); i++) {
+        const cells = Array.from(rows[i].querySelectorAll('td'));
+        if (cells.length < 10) continue;
+        const vals = cells.map(c => c.textContent.trim());
+        if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test((vals[2] || '').toUpperCase())) {
+          dataStart     = i;
+          usePositional = true;
+          break;
+        }
+      }
+      if (!usePositional) continue;
+    }
+
+    const colIndex = headerTexts ? _buildColIndex(headerTexts) : {};
+
+    for (let i = dataStart; i < rows.length; i++) {
+      const cells = Array.from(rows[i].querySelectorAll('td'));
+      if (cells.length < 2) continue;
+      const vals = cells.map(c => c.textContent.trim());
+
+      try {
+        let site;
+        if (usePositional) {
+          site = _parseRowPositional(vals, regional);
+        } else {
+          const rowObj = {};
+          for (const [field, idx] of Object.entries(colIndex)) {
+            if (idx !== undefined && idx < vals.length && vals[idx] !== '') {
+              const colName = (typeof COLUMN_MAP !== 'undefined') ? COLUMN_MAP[field][0] : field;
+              rowObj[colName] = vals[idx];
+            }
+          }
+          site = (typeof parseRow !== 'undefined')
+            ? parseRow(rowObj, regional)
+            : (colIndex.sigla !== undefined && vals[colIndex.sigla]
+                ? { sigla: vals[colIndex.sigla].trim().toUpperCase(), regional }
+                : null);
+        }
+        if (site && site.sigla) sites.push(site);
+      } catch (_) { /* skip malformed rows */ }
+    }
+  }
+
+  return sites;
 }
 
 /**
