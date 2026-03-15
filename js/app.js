@@ -856,6 +856,47 @@ function showToast(message, type = 'info', duration = 3000) {
   }, duration);
 }
 
+// ─── Shared Page Navigation Helper ───────────────────────────────────────────
+
+/**
+ * Returns an HTML string for the shared top navigation bar used on full-screen pages.
+ * @param {string} activeId - The nav link ID that should appear active (e.g. 'sites')
+ */
+function _buildPageNav(activeId) {
+  const links = [
+    { id: 'dashboard',     icon: '📊', label: 'Dashboard',  fn: 'showMainScreen()' },
+    { id: 'sites',         icon: '🏢', label: 'Sites',       fn: 'showSitesScreen()' },
+    { id: 'mosaicos',      icon: '📋', label: 'Mosaicos',    fn: 'showMosaicosScreen()' },
+    { id: 'ronda-cameras', icon: '📹', label: 'Câmeras',     fn: 'showRondaCamerasScreen()' },
+    { id: 'ronda-alarmes', icon: '🚨', label: 'Alarmes',     fn: 'showRondaAlarmesScreen()' },
+    { id: 'historico',     icon: '📜', label: 'Histórico',   fn: 'showHistoricoScreen()' },
+    { id: 'reports',       icon: '📄', label: 'Relatórios',  fn: 'showReportsScreen()' },
+    { id: 'settings',      icon: '⚙️', label: 'Config.',     fn: 'showSettingsScreen()' },
+  ];
+
+  const linksHtml = links.map(l => `
+    <button class="pnav-link ${l.id === activeId ? 'pnav-active' : ''}" onclick="${l.fn}">
+      ${l.icon} ${l.label}
+    </button>
+  `).join('');
+
+  const operador = appState.operador || '';
+
+  return `
+    <nav class="page-nav" aria-label="Navegação">
+      <div class="pnav-brand">🎯 CFTV</div>
+      <div class="pnav-links">${linksHtml}</div>
+      <div class="pnav-user">
+        <span class="pnav-operator">👤 <strong>${escapeHtml(operador)}</strong></span>
+        <button class="btn-theme pnav-theme" onclick="toggleTheme()" title="Alternar tema">
+          ${appState.darkMode ? '☀️' : '🌙'}
+        </button>
+        <button class="btn-logout pnav-logout" onclick="doLogout()">Sair</button>
+      </div>
+    </nav>
+  `;
+}
+
 // ─── Settings Screen ─────────────────────────────────────────────────────────
 
 function showSettingsScreen() {
