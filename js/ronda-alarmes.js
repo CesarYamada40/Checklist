@@ -262,7 +262,7 @@ function markAlarmSite(status, observacao = null) {
       cameras_funcionando: null,
       cameras_esperadas: null,
       observacao,
-      tipo: typeof RONDA_TIPO_ALARMES !== 'undefined' ? RONDA_TIPO_ALARMES : 'alarmes',
+      tipo: RONDA_TIPO_ALARMES,
     });
   } catch (e) {
     console.error('Failed to save alarm ronda:', e);

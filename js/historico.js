@@ -38,7 +38,8 @@ function renderHistoricoPage() {
     filtered = filtered.filter(r => r.regional === historicoState.regional);
   }
   if (historicoState.tipo !== 'todos') {
-    filtered = filtered.filter(r => (r.tipo || RONDA_TIPO_CAMERAS) === historicoState.tipo);
+    // Records without a tipo are legacy camera rounds (predating the tipo column addition)
+  filtered = filtered.filter(r => (r.tipo || RONDA_TIPO_CAMERAS) === historicoState.tipo);
   }
   if (historicoState.operador.trim()) {
     const q = historicoState.operador.trim().toLowerCase();
