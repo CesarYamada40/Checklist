@@ -58,6 +58,21 @@
         <button class="nav-tab active" id="nav-dashboard" onclick="showMainScreen()" title="Dashboard (D)">
           📊 Dashboard
         </button>
+        <button class="nav-tab" id="nav-sites" onclick="showSitesScreen()" title="Sites">
+          🏢 Sites
+        </button>
+        <button class="nav-tab" id="nav-mosaicos" onclick="showMosaicosScreen()" title="Mosaicos">
+          📋 Mosaicos
+        </button>
+        <button class="nav-tab" id="nav-ronda-cameras" onclick="showRondaCamerasScreen()" title="Ronda de Câmeras">
+          📹 Câmeras
+        </button>
+        <button class="nav-tab" id="nav-ronda-alarmes" onclick="showRondaAlarmesScreen()" title="Ronda de Alarmes">
+          🚨 Alarmes
+        </button>
+        <button class="nav-tab" id="nav-historico" onclick="showHistoricoScreen()" title="Histórico">
+          📜 Histórico
+        </button>
         <button class="nav-tab" id="nav-reports" onclick="showReportsScreen()" title="Relatórios (R)">
           📄 Relatórios
         </button>
@@ -338,6 +353,31 @@
 
   </div>
 
+  <!-- ════════════════════════════════════════════════════════ SITES SCREEN -->
+  <div id="screen-sites" class="screen hidden">
+    <!-- Content rendered dynamically by sites-page.js -->
+  </div>
+
+  <!-- ══════════════════════════════════════════════════════ MOSAICOS SCREEN -->
+  <div id="screen-mosaicos" class="screen hidden">
+    <!-- Content rendered dynamically by mosaicos.js -->
+  </div>
+
+  <!-- ══════════════════════════════════════════════ RONDA CAMERAS SCREEN -->
+  <div id="screen-ronda-cameras" class="screen hidden">
+    <!-- Content rendered dynamically by ronda-cameras.js -->
+  </div>
+
+  <!-- ══════════════════════════════════════════════ RONDA ALARMES SCREEN -->
+  <div id="screen-ronda-alarmes" class="screen hidden">
+    <!-- Content rendered dynamically by ronda-alarmes.js -->
+  </div>
+
+  <!-- ════════════════════════════════════════════════════ HISTORICO SCREEN -->
+  <div id="screen-historico" class="screen hidden">
+    <!-- Content rendered dynamically by historico.js -->
+  </div>
+
   <!-- ════════════════════════════════════════════════════════ RONDA SCREEN -->
   <div id="screen-ronda" class="screen hidden">
     <!-- Content rendered dynamically by ronda.js -->
@@ -386,6 +426,11 @@
   <script src="js/kpi.js"></script>
   <script src="js/omnisearch.js"></script>
   <script src="js/reports.js"></script>
+  <script src="js/sites-page.js"></script>
+  <script src="js/mosaicos.js"></script>
+  <script src="js/historico.js"></script>
+  <script src="js/ronda-cameras.js"></script>
+  <script src="js/ronda-alarmes.js"></script>
   <script src="js/app.js"></script>
 
 </body>

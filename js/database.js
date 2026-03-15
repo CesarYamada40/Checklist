@@ -106,6 +106,7 @@ function runMigrations() {
       ['sites', 'status3', 'TEXT'],
       ['sites', 'regional', 'TEXT'],
       ['sites', 'observacao', 'TEXT'],
+      ['rondas', 'tipo', 'TEXT DEFAULT "cameras"'],
     ];
     for (const [table, col, type] of columns) {
       try {
@@ -297,15 +298,16 @@ function searchSites(query, filter, regional) {
 
 function insertRonda(ronda) {
   db.run(
-    `INSERT INTO rondas (site_id, operador, status, cameras_funcionando, cameras_esperadas, observacao, timestamp)
-     VALUES (?, ?, ?, ?, ?, ?, datetime('now'))`,
+    `INSERT INTO rondas (site_id, operador, status, cameras_funcionando, cameras_esperadas, observacao, tipo, timestamp)
+     VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))`,
     [
       ronda.site_id,
       ronda.operador,
       ronda.status,
       ronda.cameras_funcionando ?? null,
       ronda.cameras_esperadas ?? null,
-      ronda.observacao ?? null
+      ronda.observacao ?? null,
+      ronda.tipo ?? 'cameras',
     ]
   );
   // Keep only last 30 rondas per site
@@ -349,7 +351,8 @@ function getRondasRecentes(limit = 100) {
     const stmt = db.prepare(
       `SELECT r.*, s.sigla, s.regional,
          (SELECT COUNT(*) FROM rondas r2 WHERE r2.site_id = r.site_id AND r2.status != 'OK') AS problemas,
-         1 AS total_sites
+         1 AS total_sites,
+         COALESCE(r.tipo, 'cameras') AS tipo
        FROM rondas r
        LEFT JOIN sites s ON s.id = r.site_id
        ORDER BY r.timestamp DESC
