@@ -359,8 +359,15 @@ function confirmDeleteSite(siteId, sigla) {
 
   try {
     if (!db) throw new Error('Banco de dados não inicializado');
-    db.run('DELETE FROM sites WHERE id = ?', [siteId]);
-    db.run('DELETE FROM rondas WHERE site_id = ?', [siteId]);
+    db.run('BEGIN TRANSACTION');
+    try {
+      db.run('DELETE FROM rondas WHERE site_id = ?', [siteId]);
+      db.run('DELETE FROM sites WHERE id = ?', [siteId]);
+      db.run('COMMIT');
+    } catch (e) {
+      db.run('ROLLBACK');
+      throw e;
+    }
     saveDatabase();
     if (typeof auditLog === 'function') auditLog('site_excluido', `Site ${sigla} excluído`, { target: sigla });
     showToast(`🗑️ Site ${sigla} excluído.`, 'success');

@@ -254,15 +254,20 @@ function markAlarmSite(status, observacao = null) {
   });
 
   // Save to DB as a ronda entry
-  insertRonda({
-    site_id: site.id,
-    operador: state.operador,
-    status,
-    cameras_funcionando: null,
-    cameras_esperadas: null,
-    observacao,
-    tipo: 'alarmes',
-  });
+  try {
+    insertRonda({
+      site_id: site.id,
+      operador: state.operador,
+      status,
+      cameras_funcionando: null,
+      cameras_esperadas: null,
+      observacao,
+      tipo: typeof RONDA_TIPO_ALARMES !== 'undefined' ? RONDA_TIPO_ALARMES : 'alarmes',
+    });
+  } catch (e) {
+    console.error('Failed to save alarm ronda:', e);
+    showToast('⚠️ Erro ao salvar registro. Continuando...', 'error', 3000);
+  }
 
   state.currentIndex++;
 

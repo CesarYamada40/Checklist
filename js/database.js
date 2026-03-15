@@ -6,6 +6,8 @@
 const DB_KEY = 'cftv_checklist_db';
 const DB_BACKUP_KEY = 'cftv_checklist_backup';
 const CRITICAL_OFFLINE_DAYS = 7; // Sites offline longer than this are shown as critical
+const RONDA_TIPO_CAMERAS = 'cameras';
+const RONDA_TIPO_ALARMES = 'alarmes';
 
 let db = null;
 let SQL = null;
@@ -81,6 +83,7 @@ function createSchema() {
       cameras_funcionando INTEGER,
       cameras_esperadas INTEGER,
       observacao TEXT,
+      tipo TEXT,
       timestamp TEXT DEFAULT (datetime('now')),
       FOREIGN KEY (site_id) REFERENCES sites(id)
     );
@@ -106,7 +109,7 @@ function runMigrations() {
       ['sites', 'status3', 'TEXT'],
       ['sites', 'regional', 'TEXT'],
       ['sites', 'observacao', 'TEXT'],
-      ['rondas', 'tipo', 'TEXT DEFAULT "cameras"'],
+      ['rondas', 'tipo', 'TEXT'],
     ];
     for (const [table, col, type] of columns) {
       try {
@@ -307,7 +310,7 @@ function insertRonda(ronda) {
       ronda.cameras_funcionando ?? null,
       ronda.cameras_esperadas ?? null,
       ronda.observacao ?? null,
-      ronda.tipo ?? 'cameras',
+      ronda.tipo ?? RONDA_TIPO_CAMERAS,
     ]
   );
   // Keep only last 30 rondas per site
