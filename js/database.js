@@ -53,7 +53,7 @@ function createSchema() {
 
     CREATE TABLE IF NOT EXISTS sites (
       id INTEGER PRIMARY KEY AUTOINCREMENT,
-      conta INTEGER UNIQUE,
+      conta INTEGER,
       sigla TEXT UNIQUE NOT NULL,
       status_conexao TEXT,
       data_desconexao TEXT,
@@ -95,10 +95,106 @@ function createSchema() {
 }
 
 /**
+ * Check whether the sites table has a UNIQUE constraint on the conta column by
+ * inspecting the index list rather than the raw DDL text.
+ * @returns {boolean}
+ */
+function _sitesContaHasUniqueConstraint() {
+  const indexListResult = db.exec(`PRAGMA index_list(sites)`);
+  const indexes = indexListResult[0]?.values || [];
+  for (const row of indexes) {
+    // row: [seq, name, unique, origin, partial]
+    const unique = row[2];
+    if (!unique) continue;
+    const name = row[1];
+    const indexInfoResult = db.exec(`PRAGMA index_info('${name}')`);
+    const cols = indexInfoResult[0]?.values || [];
+    // A standalone UNIQUE constraint on conta has exactly one column named 'conta'
+    if (cols.length === 1 && cols[0][2] === 'conta') return true;
+  }
+  return false;
+}
+
+/**
+ * Remove the UNIQUE constraint from the conta column in the sites table.
+ * SQLite does not support ALTER TABLE DROP CONSTRAINT, so the table must be recreated.
+ */
+function _migrateRemoveContaUnique() {
+  try {
+    if (!_sitesContaHasUniqueConstraint()) return;
+
+    console.log('[Database] Migration: removing UNIQUE constraint from sites.conta');
+    db.run('PRAGMA foreign_keys = OFF');
+    db.run('BEGIN TRANSACTION');
+    try {
+      db.run(`
+        CREATE TABLE sites_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          conta INTEGER,
+          sigla TEXT UNIQUE NOT NULL,
+          status_conexao TEXT,
+          data_desconexao TEXT,
+          os TEXT,
+          zona TEXT,
+          status4 TEXT,
+          padrao_cameras INTEGER,
+          cameras_ontem INTEGER,
+          cameras_hoje INTEGER,
+          status2 TEXT,
+          data_alteracao TEXT,
+          vegetacao_alta INTEGER DEFAULT 0,
+          data_alteracao_vegetacao TEXT,
+          camera_problema TEXT,
+          status3 TEXT,
+          regional TEXT,
+          observacao TEXT,
+          created_at TEXT DEFAULT (datetime('now')),
+          updated_at TEXT DEFAULT (datetime('now'))
+        )
+      `);
+      db.run(`
+        INSERT INTO sites_new (
+          id, conta, sigla, status_conexao, data_desconexao, os, zona, status4,
+          padrao_cameras, cameras_ontem, cameras_hoje, status2, data_alteracao,
+          vegetacao_alta, data_alteracao_vegetacao, camera_problema, status3,
+          regional, observacao, created_at, updated_at
+        )
+        SELECT
+          id, conta, sigla, status_conexao, data_desconexao, os, zona, status4,
+          padrao_cameras, cameras_ontem, cameras_hoje, status2, data_alteracao,
+          vegetacao_alta, data_alteracao_vegetacao, camera_problema, status3,
+          regional, observacao, created_at, updated_at
+        FROM sites
+      `);
+      db.run(`DROP TABLE sites`);
+      db.run(`ALTER TABLE sites_new RENAME TO sites`);
+      db.run('COMMIT');
+      console.log('[Database] Migration complete: sites.conta UNIQUE constraint removed');
+    } catch (e) {
+      db.run('ROLLBACK');
+      throw e;
+    } finally {
+      db.run('PRAGMA foreign_keys = ON');
+    }
+  } catch (e) {
+    console.error('[Database] CRITICAL: Migration _migrateRemoveContaUnique failed:', e);
+    // Surface the error so callers can decide how to handle it
+    throw e;
+  }
+}
+
+/**
  * Run schema migrations to add missing columns
  */
 function runMigrations() {
   try {
+    // Migration: remove UNIQUE constraint from conta (must run before column additions)
+    try {
+      _migrateRemoveContaUnique();
+    } catch (migErr) {
+      console.error('[Database] runMigrations: conta UNIQUE migration failed, imports may be affected:', migErr);
+    }
+
     // Ensure all columns exist (idempotent)
     const columns = [
       ['sites', 'cameras_ontem', 'INTEGER'],
