@@ -207,12 +207,12 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   z-index: 200;
-  max-height: 360px;
+  max-height: 80vh;
   overflow-y: auto;
   animation: slideInUp .15s ease both;
 }
 .omnisearch-section-label {
-  font-size: .7rem;
+  font-size: .9rem;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
@@ -223,9 +223,9 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 8px 12px;
+  padding: 14px 16px;
   cursor: pointer;
-  font-size: .82rem;
+  font-size: 1rem;
   color: var(--text);
   transition: background .12s;
   border: none;
@@ -237,9 +237,9 @@
 .omnisearch-item.active {
   background: var(--surface2);
 }
-.omnisearch-item-icon { font-size: 1rem; flex-shrink: 0; }
+.omnisearch-item-icon { font-size: 1.1rem; flex-shrink: 0; }
 .omnisearch-item-main { flex: 1; font-weight: 600; }
-.omnisearch-item-sub  { font-size: .72rem; color: var(--text-muted); }
+.omnisearch-item-sub  { font-size: .9rem; color: var(--text-muted); }
 .omnisearch-item mark {
   background: rgba(59,130,246,.3);
   color: var(--text);
