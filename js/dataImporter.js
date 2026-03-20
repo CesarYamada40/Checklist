@@ -231,6 +231,46 @@ function _buildColIndex(headerTexts) {
 }
 
 /**
+ * Expand HTML table cells into a flat array of string values, filling extra
+ * empty-string slots for every column spanned by a merged cell (colspan > 1).
+ *
+ * Google Sheets HTML exports use colspan on merged-header cells; without
+ * expansion, the cell count is lower than the column count, which breaks both
+ * the `cells.length` guards and every positional column index downstream.
+ *
+ * @param {Element[]} cells  Array of th/td DOM elements
+ * @returns {string[]}  Text values, one entry per logical column
+ */
+function _expandRowCells(cells) {
+  const vals = [];
+  for (const cell of cells) {
+    const text = (cell.textContent || '').trim();
+    const span = parseInt(cell.getAttribute('colspan') || '1', 10) || 1;
+    vals.push(text);
+    for (let k = 1; k < span; k++) vals.push(''); // pad spanned columns
+  }
+  return vals;
+}
+
+/**
+ * Return true when an array of (upper-cased) expanded header texts looks like
+ * a data-header row containing at least a CONTA or SIGLA/SITE column.
+ * Uses substring matching so variants like "SIGLA DO SITE" or "Nº CONTA" match.
+ * The 60-character length guard avoids false positives in long body-text cells
+ * (e.g. a comment cell that happens to contain the word "CONTA" mid-sentence).
+ *
+ * @param {string[]} texts  Upper-cased cell texts (colspan-expanded)
+ * @returns {boolean}
+ */
+function _rowIsHeader(texts) {
+  const MAX = 60;
+  const hasConta = texts.some(t => t === 'CONTA' || (t.length <= MAX && t.includes('CONTA')));
+  const hasSigla = texts.some(t => t === 'SIGLA' || t === 'SITE' ||
+                                    (t.length <= MAX && (t.includes('SIGLA') || t.includes('SITE'))));
+  return hasConta || hasSigla;
+}
+
+/**
  * Apply positional column mapping for the known fixed-column HTML export format:
  *   Col 0: seq#, Col 1: CONTA, Col 2: SIGLA, Col 3: STATUS,
  *   Col 4: DATA, Col 5: O.S., Col 6: ZONA, Col 7: STATUS4,
@@ -359,13 +399,11 @@ function importFromHTML(htmlContent, regional) {
 
     for (let i = 0; i < Math.min(15, rows.length); i++) {
       const cells = Array.from(rows[i].querySelectorAll('th,td'));
-      if (cells.length < 3) continue;
-      const texts = cells.map(c => c.textContent.trim().toUpperCase());
+      // Expand cells to account for colspan (merged headers in Google Sheets)
+      const texts = _expandRowCells(cells).map(t => t.toUpperCase());
+      if (texts.length < 3) continue;
 
-      const hasConta = texts.some(t => t === 'CONTA');
-      const hasSigla = texts.some(t => t === 'SIGLA' || t === 'SITE');
-
-      if (hasConta || hasSigla) {
+      if (_rowIsHeader(texts)) {
         headerTexts = texts;
         dataStart   = i + 1;
         break;
@@ -374,17 +412,21 @@ function importFromHTML(htmlContent, regional) {
 
     // No named-header found → try positional (fixed-column) detection
     if (!headerTexts) {
-      // Check if first data row has a potential sigla in column index 2
+      // Check if first data row has a potential sigla in columns 1–5
       for (let i = 0; i < Math.min(15, rows.length); i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
-        if (cells.length < 10) continue;
-        const vals = cells.map(c => c.textContent.trim());
-        const candidate = vals[2] || '';
-        if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test(candidate.toUpperCase())) {
-          dataStart     = i;
-          usePositional = true;
-          break;
+        // Expand to count merged/spanned columns correctly
+        const vals = _expandRowCells(cells);
+        if (vals.length < 3) continue;
+        // Accept sigla in any of columns 1–5 (handles slight layout variations)
+        for (let col = 1; col <= Math.min(5, vals.length - 1); col++) {
+          if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test((vals[col] || '').toUpperCase())) {
+            dataStart     = i;
+            usePositional = true;
+            break;
+          }
         }
+        if (usePositional) break;
       }
       if (!usePositional) continue; // cannot parse this table
     }
@@ -397,9 +439,9 @@ function importFromHTML(htmlContent, regional) {
     try {
       for (let i = dataStart; i < rows.length; i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
-        if (cells.length < 2) { skipped++; continue; }
-
-        const vals = cells.map(c => c.textContent.trim());
+        // Expand colspan so positional indices are correct
+        const vals = _expandRowCells(cells);
+        if (vals.length < 2) { skipped++; continue; }
 
         try {
           let site;
@@ -484,9 +526,10 @@ function parseRegionalHTML(htmlContent, regionalCode) {
     // Search up to 15 rows to handle merged/grouped headers in large exports
     for (let i = 0; i < Math.min(15, rows.length); i++) {
       const cells = Array.from(rows[i].querySelectorAll('th,td'));
-      if (cells.length < 3) continue;
-      const texts = cells.map(c => c.textContent.trim().toUpperCase());
-      if (texts.some(t => t === 'CONTA') || texts.some(t => t === 'SIGLA' || t === 'SITE')) {
+      // Expand cells to account for colspan (merged headers in Google Sheets)
+      const texts = _expandRowCells(cells).map(t => t.toUpperCase());
+      if (texts.length < 3) continue;
+      if (_rowIsHeader(texts)) {
         headerTexts = texts;
         dataStart   = i + 1;
         break;
@@ -494,15 +537,20 @@ function parseRegionalHTML(htmlContent, regionalCode) {
     }
 
     if (!headerTexts) {
+      // No named-header found → try positional (fixed-column) detection
+      // Expand cells and look for a sigla-shaped value in columns 1–5
       for (let i = 0; i < Math.min(15, rows.length); i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
-        if (cells.length < 10) continue;
-        const vals = cells.map(c => c.textContent.trim());
-        if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test((vals[2] || '').toUpperCase())) {
-          dataStart     = i;
-          usePositional = true;
-          break;
+        const vals = _expandRowCells(cells);
+        if (vals.length < 3) continue;
+        for (let col = 1; col <= Math.min(5, vals.length - 1); col++) {
+          if (/^[A-Z]{2}[A-Z0-9]{2,8}$/.test((vals[col] || '').toUpperCase())) {
+            dataStart     = i;
+            usePositional = true;
+            break;
+          }
         }
+        if (usePositional) break;
       }
       if (!usePositional) continue;
     }
@@ -511,8 +559,9 @@ function parseRegionalHTML(htmlContent, regionalCode) {
 
     for (let i = dataStart; i < rows.length; i++) {
       const cells = Array.from(rows[i].querySelectorAll('td'));
-      if (cells.length < 2) continue;
-      const vals = cells.map(c => c.textContent.trim());
+      // Expand colspan so positional indices remain correct
+      const vals = _expandRowCells(cells);
+      if (vals.length < 2) continue;
 
       try {
         let site;
