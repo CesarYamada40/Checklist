@@ -15,14 +15,20 @@ const SIGLA_POOLS = {
   RS: ['CBM','GTI','POA','CFD','CAX','PEL','STA','CSU','GRA','IJU',
        'SAP','URI','CRU','ERI','VIO','TRE','BPO','NOV','LIV','ALG',
        'PAR','BAG','TAP','ENT','SAN','CRO','SAL','GUA','ALE','TOR'],
+  // SPI = São Paulo Interior (inland SP cities)
+  SPI: ['CMP','RBO','SJC','SCA','BAU','SOS','PRP','MAR','ARA','SBD',
+        'JAU','LNS','ITA','AQU','OUR','BBR','CAT','MCA','FRC','TAT',
+        'SJR','TUP','PBA','GUA','INH','VAR','ANA','POR','BOT','PIL'],
 };
 
 // ─── Regional target data (from actual spreadsheets) ─────────────────────────
 
 const REGIONAL_META = {
-  PR: { totalSites: 86, alarmesDesconectados: 21, cftvDesconectado: 15, cftvParcial: 4, vegetacao: 0 },
-  SC: { totalSites: 83, alarmesDesconectados: 16, cftvDesconectado: 50, cftvParcial: 6, vegetacao: 0 },
-  RS: { totalSites: 66, alarmesDesconectados: 14, cftvDesconectado: 75, cftvParcial: 8, vegetacao: 0 },
+  PR:  { totalSites: 86, alarmesDesconectados: 21, cftvDesconectado: 15, cftvParcial: 4, vegetacao: 0 },
+  SC:  { totalSites: 83, alarmesDesconectados: 16, cftvDesconectado: 50, cftvParcial: 6, vegetacao: 0 },
+  RS:  { totalSites: 66, alarmesDesconectados: 14, cftvDesconectado: 75, cftvParcial: 8, vegetacao: 0 },
+  // SPI = São Paulo Interior
+  SPI: { totalSites: 72, alarmesDesconectados: 18, cftvDesconectado: 22, cftvParcial: 7, vegetacao: 0 },
 };
 
 // ─── Known real site siglas (from operational spreadsheets) ──────────────────
@@ -43,6 +49,12 @@ const REAL_SIGLAS = {
     { sigla: 'RSCBM04', conta: 1015 }, { sigla: 'RSGTI15', conta: 2156 },
     { sigla: 'RSPOA01', conta: 2001 }, { sigla: 'RSCFD02', conta: 2102 },
     { sigla: 'RSCAX03', conta: 2203 }, { sigla: 'RSPEL05', conta: 2305 },
+  ],
+  // SPI = São Paulo Interior – siglas use "SP" prefix to follow the same 2-char convention
+  SPI: [
+    { sigla: 'SPCMP01', conta: 3001 }, { sigla: 'SPRBO02', conta: 3102 },
+    { sigla: 'SPSJC03', conta: 3203 }, { sigla: 'SPSCA04', conta: 3304 },
+    { sigla: 'SPBAU05', conta: 3405 }, { sigla: 'SPSOS06', conta: 3506 },
   ],
 };
 
@@ -66,7 +78,7 @@ function _genSigla(regional, index) {
 function _genConta(regional, index) {
   const realList = REAL_SIGLAS[regional] || [];
   if (index < realList.length) return realList[index].conta;
-  const baseContaOffset = regional === 'PR' ? 0 : regional === 'SC' ? 100 : 200;
+  const baseContaOffset = regional === 'PR' ? 0 : regional === 'SC' ? 100 : regional === 'RS' ? 200 : 300;
   return 1300 + baseContaOffset + index;
 }
 
@@ -160,7 +172,7 @@ function seedDemoDataIfEmpty() {
     let totalImported = 0;
     db.run('BEGIN TRANSACTION');
     try {
-      for (const regional of ['PR', 'SC', 'RS']) {
+      for (const regional of ['PR', 'SC', 'RS', 'SPI']) {
         for (const site of _generateRegionalSites(regional)) {
           upsertSite(site);
           totalImported++;
@@ -239,11 +251,15 @@ function _parseRowPositional(vals, regional) {
 
   const conta = parseInt(vals[1], 10) || null;
 
-  // Derive regional from sigla prefix if not provided
+  // Derive regional from sigla prefix if not provided.
+  // SPI sites use "SP" as the 2-char prefix (São Paulo Interior).
   let reg = regional;
   if (!reg && sigla.length >= 2) {
     const prefix = sigla.slice(0, 2);
-    if (['PR', 'SC', 'RS'].includes(prefix)) reg = prefix;
+    if (prefix === 'PR') reg = 'PR';
+    else if (prefix === 'SC') reg = 'SC';
+    else if (prefix === 'RS') reg = 'RS';
+    else if (prefix === 'SP') reg = 'SPI';
   }
 
   const statusConexao = (vals[3] || '').trim().toUpperCase() || null;
@@ -304,10 +320,16 @@ function _parseRowPositional(vals, regional) {
 /**
  * Parse and import an HTML table string into the database.
  * Supports both named-column HTML exports and positional fixed-column format
- * (Cols A-AF as exported from Google Sheets / Excel for PR, SC and RS regionals).
+ * (Cols A-AF as exported from Google Sheets / Excel for PR, SC, RS and SPI regionals).
+ *
+ * Best practices for large HTML files:
+ *  - Export one regional at a time (PR.html, RS.html, SC.html, SPI.html separately).
+ *  - Use the file-upload tab instead of paste for files > 1 MB to avoid browser limits.
+ *  - If the file is very large, open it in a text editor to confirm all rows are present
+ *    before importing (check that the last row matches the expected site count).
  *
  * @param {string} htmlContent  HTML string to parse
- * @param {string} [regional]   Regional override ('PR'|'SC'|'RS')
+ * @param {string} [regional]   Regional override ('PR'|'SC'|'RS'|'SPI')
  * @returns {{ imported: number, updated: number, skipped: number, errors: string[] }}
  */
 function importFromHTML(htmlContent, regional) {
@@ -330,12 +352,12 @@ function importFromHTML(htmlContent, regional) {
     const rows = Array.from(table.querySelectorAll('tr'));
     if (rows.length < 2) continue;
 
-    // ── Find the header row ──────────────────────────────────────────────────
+    // ── Find the header row (search up to 15 rows to handle merged headers) ──
     let headerTexts = null;
     let dataStart   = 0;
     let usePositional = false;
 
-    for (let i = 0; i < Math.min(8, rows.length); i++) {
+    for (let i = 0; i < Math.min(15, rows.length); i++) {
       const cells = Array.from(rows[i].querySelectorAll('th,td'));
       if (cells.length < 3) continue;
       const texts = cells.map(c => c.textContent.trim().toUpperCase());
@@ -353,7 +375,7 @@ function importFromHTML(htmlContent, regional) {
     // No named-header found → try positional (fixed-column) detection
     if (!headerTexts) {
       // Check if first data row has a potential sigla in column index 2
-      for (let i = 0; i < Math.min(8, rows.length); i++) {
+      for (let i = 0; i < Math.min(15, rows.length); i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
         if (cells.length < 10) continue;
         const vals = cells.map(c => c.textContent.trim());
@@ -431,7 +453,7 @@ function importFromHTML(htmlContent, regional) {
  * saving to the database.  Useful for preview, validation, or custom processing.
  *
  * @param {string} htmlContent   Full HTML string of the exported spreadsheet
- * @param {string} [regionalCode] Override regional code ('PR'|'SC'|'RS').
+ * @param {string} [regionalCode] Override regional code ('PR'|'SC'|'RS'|'SPI').
  *   If omitted, the regional is auto-detected from the page title / file name.
  * @returns {object[]}  Array of site objects matching the database schema
  *
@@ -459,7 +481,8 @@ function parseRegionalHTML(htmlContent, regionalCode) {
     let dataStart   = 0;
     let usePositional = false;
 
-    for (let i = 0; i < Math.min(8, rows.length); i++) {
+    // Search up to 15 rows to handle merged/grouped headers in large exports
+    for (let i = 0; i < Math.min(15, rows.length); i++) {
       const cells = Array.from(rows[i].querySelectorAll('th,td'));
       if (cells.length < 3) continue;
       const texts = cells.map(c => c.textContent.trim().toUpperCase());
@@ -471,7 +494,7 @@ function parseRegionalHTML(htmlContent, regionalCode) {
     }
 
     if (!headerTexts) {
-      for (let i = 0; i < Math.min(8, rows.length); i++) {
+      for (let i = 0; i < Math.min(15, rows.length); i++) {
         const cells = Array.from(rows[i].querySelectorAll('td'));
         if (cells.length < 10) continue;
         const vals = cells.map(c => c.textContent.trim());
@@ -580,7 +603,7 @@ function openHTMLImportModal() {
       <div class="html-import-header">
         <div class="html-import-header-text">
           <h2 class="html-import-title">📥 Importar Planilha HTML Regional</h2>
-          <p class="html-import-subtitle">Suporta exportações do Google Sheets: PR.html, SC.html, RS.html</p>
+          <p class="html-import-subtitle">Suporta exportações do Google Sheets: PR.html, SC.html, RS.html, SPI.html</p>
         </div>
         <button class="html-import-close" onclick="closeHTMLImportModal()" aria-label="Fechar">✕</button>
       </div>
@@ -626,8 +649,11 @@ function openHTMLImportModal() {
                  onchange="handleHTMLImportFileInput(event)">
         </div>
         <p class="html-import-hint">
-          💡 Selecione um ou mais arquivos: <code>PR.html</code>, <code>SC.html</code>, <code>RS.html</code>.
+          💡 Selecione um ou mais arquivos: <code>PR.html</code>, <code>SC.html</code>, <code>RS.html</code>, <code>SPI.html</code>.
           A regional é detectada automaticamente pelo nome do arquivo.
+          <br>
+          ⚠️ <strong>Arquivos grandes:</strong> carregue um arquivo por vez para evitar sobrecarga do navegador.
+          Você pode repetir a importação com arquivos adicionais — sites já cadastrados serão identificados como duplicatas.
         </p>
       </div>
 
@@ -640,6 +666,7 @@ function openHTMLImportModal() {
             <option value="PR">📍 PR – Paraná</option>
             <option value="SC">📍 SC – Santa Catarina</option>
             <option value="RS">📍 RS – Rio Grande do Sul</option>
+            <option value="SPI">📍 SPI – São Paulo Interior</option>
           </select>
           <button class="btn btn-outline btn-sm" onclick="loadHTMLImportSample()">📄 Exemplo</button>
         </div>
@@ -778,10 +805,19 @@ async function _processHTMLImportFiles(files) {
     try {
       const html = await _readFileAsText(file);
       // detectRegional(sheetName, fileName): pass empty string for sheetName since
-      // we are detecting from the file name only (e.g. "PR.html" → 'PR')
+      // we are detecting from the file name only (e.g. "SPI.html" → 'SPI')
       const reg = (typeof detectRegional === 'function')
         ? detectRegional('', file.name) : null;
       const sites = parseRegionalHTML(html, reg || undefined);
+      console.log(`[HTML import] ${file.name}: ${sites.length} sites detectados` +
+        (reg ? ` (regional ${reg})` : ' (regional não detectada)'));
+      // Warn immediately if count seems low for a known regional
+      if (reg && REGIONAL_META[reg] && sites.length < REGIONAL_META[reg].totalSites) {
+        console.warn(
+          `[HTML import] ${file.name}: esperados ${REGIONAL_META[reg].totalSites} sites, ` +
+          `encontrados ${sites.length}. O arquivo pode estar incompleto.`
+        );
+      }
       allSites.push(...sites);
     } catch (e) {
       showToast(`❌ Erro em ${file.name}: ${e.message}`, 'error', 4000);
@@ -840,6 +876,8 @@ function loadHTMLImportSample() {
 /**
  * Render the preview table with new/update badges.
  * Each site is annotated with _existing (DB record or null) and _include (bool).
+ * Emits a validation warning when the imported count is lower than the expected
+ * total for a single-regional import (helps catch partial-load issues).
  */
 function _showHTMLImportPreview() {
   const sites = _importState.sites;
@@ -864,6 +902,29 @@ function _showHTMLImportPreview() {
     return { ...s, _existing: existing };
   });
   _importState.sites = annotated;
+
+  // ── Validate count against expected regional totals ───────────────────────
+  // When all parsed sites belong to a single regional, warn if the count is
+  // lower than the known expected total (indicates a partial / truncated import).
+  const uniqueRegionals = [...new Set(annotated.map(s => s.regional).filter(Boolean))];
+  if (uniqueRegionals.length === 1) {
+    const reg = uniqueRegionals[0];
+    const expected = (REGIONAL_META[reg] || {}).totalSites;
+    if (expected && annotated.length < expected) {
+      const missing = expected - annotated.length;
+      console.warn(
+        `[HTML import] Regional ${reg}: encontrados ${annotated.length} de ${expected} sites esperados. ` +
+        `${missing} site(s) podem estar faltando. ` +
+        'Certifique-se de que o arquivo HTML exportado contém todas as linhas da planilha.'
+      );
+      showToast(
+        `⚠️ Regional ${reg}: ${annotated.length} de ${expected} sites esperados detectados ` +
+        `(${missing} possivelmente ausente${missing > 1 ? 's' : ''}). ` +
+        'Verifique se o arquivo HTML está completo.',
+        'warning', 8000
+      );
+    }
+  }
 
   const newCount = annotated.filter(s => !s._existing).length;
   const updCount = annotated.filter(s =>  s._existing).length;
