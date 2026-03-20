@@ -685,7 +685,7 @@ function triggerXLSXImport() {
     reader.onload = ev => {
       try {
         const result = importXLSX(ev.target.result, file.name);
-        const msg = `✅ Importados: ${result.imported} novos, ${result.updated} atualizados, ${result.skipped} ignorados`;
+        const msg = `✅ Importados: ${result.imported} novos, ${result.updated} atualizados, ${result.skipped} ignorados — dados existentes preservados`;
         showToast(msg, 'success', 5000);
         if (result.errors.length) {
           console.warn('Import errors:', result.errors);
@@ -708,7 +708,7 @@ function triggerStartRonda() {
   if (!appState.operador) { showToast('Faça login primeiro.', 'error'); return; }
   const sites = getAllSites();
   if (!sites.length) {
-    showToast('Importe uma planilha XLSX primeiro.', 'error');
+    showToast('Importe uma planilha de sites primeiro.', 'error');
     return;
   }
 
