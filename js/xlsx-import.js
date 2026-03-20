@@ -41,14 +41,18 @@ const COLUMN_MAP = {
 };
 
 /**
- * Detect regional (PR/SC/RS) from a sheet name or file name string
+ * Detect regional (PR/SC/RS/SPI) from a sheet name or file name string.
+ * SPI = São Paulo Interior (regional code used for inland SP sites).
+ *
  * @param {string} sheetName
  * @param {string} [fileName]
- * @returns {'PR'|'SC'|'RS'|null}
+ * @returns {'PR'|'SC'|'RS'|'SPI'|null}
  */
 function detectRegional(sheetName, fileName) {
   const text = `${sheetName || ''} ${fileName || ''}`.toUpperCase();
-  // Match whole-word or known state names
+  // Match whole-word or known state/regional names
+  // SPI must be checked before generic SP to avoid false positives
+  if (/\bSPI\b|SP INTERIOR|S[AÃ]O PAULO INTERIOR/.test(text)) return 'SPI';
   if (/\bRS\b|RIO GRANDE/.test(text)) return 'RS';
   if (/\bSC\b|SANTA CATARINA/.test(text)) return 'SC';
   if (/\bPR\b|PARAN[AÁ]/.test(text)) return 'PR';
