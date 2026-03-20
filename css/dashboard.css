@@ -454,6 +454,32 @@
 }
 .html-import-close:hover { color: var(--text); background: var(--surface2); }
 
+/* Non-destructive import info banner */
+.html-import-info-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  margin: 12px 20px 4px;
+  padding: 10px 14px;
+  background: color-mix(in srgb, var(--primary, #2563eb) 8%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--primary, #2563eb) 25%, transparent);
+  border-radius: 8px;
+  font-size: .82rem;
+  color: var(--text);
+  line-height: 1.5;
+}
+.html-import-info-icon {
+  flex-shrink: 0;
+  font-size: 1rem;
+  margin-top: 1px;
+}
+.html-import-dup-hint {
+  cursor: help;
+  font-size: .8rem;
+  color: var(--text-muted);
+  margin-left: 4px;
+}
+
 /* Tab navigation */
 .html-import-tabs {
   display: flex;

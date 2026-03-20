@@ -585,6 +585,16 @@ function openHTMLImportModal() {
         <button class="html-import-close" onclick="closeHTMLImportModal()" aria-label="Fechar">✕</button>
       </div>
 
+      <!-- Info banner: non-destructive import -->
+      <div class="html-import-info-banner" role="note" aria-label="Informação sobre importação">
+        <span class="html-import-info-icon" aria-hidden="true">ℹ️</span>
+        <span>
+          <strong>Importação não destrutiva:</strong> os sites já cadastrados nunca são apagados.
+          Você pode importar novas planilhas a qualquer momento para <strong>adicionar mais sites</strong> sem perder os dados existentes.
+          Use o modo <em>"Apenas novos"</em> para garantir que nenhum site existente seja alterado.
+        </span>
+      </div>
+
       <!-- Tabs -->
       <div class="html-import-tabs" role="tablist">
         <button class="html-import-tab html-import-tab-active"
@@ -649,10 +659,17 @@ function openHTMLImportModal() {
         <div class="preview-summary-bar">
           <div id="html-import-preview-count" class="preview-count" role="status"></div>
           <div class="preview-dup-row">
-            <label class="html-import-label" for="html-import-dup-mode">Sites duplicados:</label>
+            <label class="html-import-label" for="html-import-dup-mode">
+              Sites duplicados:
+              <span class="html-import-dup-hint"
+                    role="tooltip"
+                    aria-label="Define o que acontece quando um site da planilha já existe no banco de dados. Os dados dos demais sites existentes nunca são apagados."
+                    title="Define o que acontece quando um site da planilha já existe no banco de dados. Os dados dos demais sites existentes nunca são apagados."
+                    tabindex="0">❓</span>
+            </label>
             <select id="html-import-dup-mode" class="html-import-select html-import-select-sm">
-              <option value="merge">Atualizar dados existentes (mesclar)</option>
-              <option value="skip">Ignorar sites já cadastrados</option>
+              <option value="skip" aria-label="Apenas novos — manter dados existentes intactos">✅ Apenas novos — manter dados existentes intactos</option>
+              <option value="merge" aria-label="Mesclar — atualizar campos dos sites existentes">🔄 Mesclar — atualizar campos dos sites existentes</option>
             </select>
           </div>
         </div>
@@ -855,8 +872,8 @@ function _showHTMLImportPreview() {
   if (countEl) {
     countEl.innerHTML =
       `<strong>${annotated.length}</strong> sites encontrados &mdash; ` +
-      `<span class="preview-count-new">${newCount} novos</span>` +
-      ` / <span class="preview-count-upd">${updCount} já existentes</span>`;
+      `<span class="preview-count-new"><span aria-hidden="true">✅</span> ${newCount} novos</span>` +
+      ` / <span class="preview-count-upd"><span aria-hidden="true">🔄</span> ${updCount} já cadastrados</span>`;
   }
 
   const tbody = document.getElementById('html-import-preview-tbody');
@@ -932,7 +949,7 @@ function confirmHTMLImport() {
   if (errors.length) console.warn('[HTML import errors]', errors);
 
   showToast(
-    `✅ Importação concluída: ${imported} novos, ${updated} atualizados, ${skipped} ignorados`,
+    `✅ Importação concluída: ${imported} novos adicionados, ${updated} atualizados, ${skipped} ignorados — demais dados preservados`,
     'success', 5000
   );
 
