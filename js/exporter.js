@@ -118,7 +118,23 @@ function exportExcelMultiTab() {
 // ─── PDF (print dialog) ───────────────────────────────────────────────────────
 
 /**
+ * Returns a background color string for a given status value.
+ * @param {string} status
+ * @returns {string} CSS background-color value
+ */
+function _statusBg(status) {
+  if (!status) return 'transparent';
+  const s = status.toUpperCase();
+  if (s === 'OK' || s === 'ONLINE')         return '#d1fae5'; // green-100
+  if (s === 'PARCIAL')                       return '#fef9c3'; // yellow-100
+  if (s === 'DESCONECTADO' || s === 'OFFLINE') return '#fee2e2'; // red-100
+  return 'transparent';
+}
+
+/**
  * Open a print-ready HTML report in a new window and trigger the print dialog.
+ * Includes: summary cards, regional stats table, full sites list with colored
+ * status rows, and (when available) active problem list.
  */
 function exportPDF() {
   try {
@@ -146,6 +162,30 @@ function exportPDF() {
         <td style="color:#ef4444">${s.cftv_desconectado || 0}</td>
         <td>${pct(s.cftv_ok || 0, cftvDen)}</td>
         <td style="color:#34d399">${s.vegetacao_alta || 0}</td>
+      </tr>`;
+    }).join('');
+
+    // All sites with colored status rows
+    const allSites = typeof searchSites === 'function' ? searchSites('', 'todos', 'todos') : [];
+    const allSiteRows = allSites.map(s => {
+      const alarmBg = _statusBg(s.status_conexao);
+      const cftvBg  = _statusBg(s.status2);
+      const lastBg  = _statusBg(s.ultimo_status_ronda);
+      const hasCam = s.cameras_hoje != null && s.padrao_cameras != null;
+      const cam = hasCam
+        ? `${s.cameras_hoje}/${s.padrao_cameras}`
+        : (s.padrao_cameras != null ? `—/${s.padrao_cameras}` : '—');
+      const camWarnStyle = (hasCam && s.cameras_hoje < s.padrao_cameras)
+        ? 'color:#ef4444;font-weight:600' : '';
+      return `<tr>
+        <td>${escapeHtml(s.regional || '—')}</td>
+        <td><strong>${escapeHtml(s.sigla)}</strong></td>
+        <td>${s.conta || '—'}</td>
+        <td style="background:${alarmBg}">${escapeHtml(s.status_conexao || '—')}</td>
+        <td style="background:${cftvBg}">${escapeHtml(s.status2 || '—')}</td>
+        <td style="${camWarnStyle}">${cam}</td>
+        <td>${escapeHtml(s.os || '—')}</td>
+        <td style="background:${lastBg}">${escapeHtml(s.ultimo_status_ronda || 'Não verificado')}</td>
       </tr>`;
     }).join('');
 
@@ -183,9 +223,14 @@ function exportPDF() {
     th { background: #1e40af; color: #fff; padding: 6px 8px; text-align: left; font-size: 11px; }
     td { padding: 5px 8px; border-bottom: 1px solid #e5e7eb; font-size: 11px; }
     tr:nth-child(even) td { background: #f9fafb; }
+    tr:nth-child(even) td[style] { filter: brightness(0.97); } /* slightly darken colored status cells on even rows */
+    .legend { display: flex; gap: 16px; font-size: 11px; margin-bottom: 12px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 3px; display: inline-block; }
     @media print {
       body { margin: 10px; }
       h2 { page-break-before: auto; }
+      .no-print { display: none; }
     }
   </style>
 </head>
@@ -243,6 +288,23 @@ function exportPDF() {
       </tr>
     </thead>
     <tbody>${problemRows}</tbody>
+  </table>` : ''}
+
+  ${allSites.length ? `
+  <h2>📋 Lista Completa de Sites (${allSites.length})</h2>
+  <div class="legend">
+    <span class="legend-item"><span class="legend-dot" style="background:#d1fae5"></span> OK / Online</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fef9c3"></span> Parcial</span>
+    <span class="legend-item"><span class="legend-dot" style="background:#fee2e2"></span> Desconectado / Offline</span>
+  </div>
+  <table>
+    <thead>
+      <tr>
+        <th>Regional</th><th>Sigla</th><th>Conta</th>
+        <th>Alarme</th><th>CFTV</th><th>Câmeras</th><th>O.S.</th><th>Último Status</th>
+      </tr>
+    </thead>
+    <tbody>${allSiteRows}</tbody>
   </table>` : ''}
 </body>
 </html>`;

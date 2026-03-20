@@ -183,6 +183,13 @@ function setSitesQuery(query) {
   sitesPageState.query = query;
   sitesPageState.page = 1;
   renderSitesPage();
+  // Restore focus after full page re-render to prevent focus loss while typing
+  const input = document.getElementById('sp-search');
+  if (input) {
+    input.focus();
+    const len = input.value.length;
+    input.setSelectionRange(len, len);
+  }
 }
 
 function setSitesRegional(regional) {
